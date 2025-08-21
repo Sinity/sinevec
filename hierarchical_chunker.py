@@ -427,9 +427,9 @@ def flatten_hierarchy_smart(root: ChunkNode, max_tokens: int = 30000) -> List[Li
                 current_group = []
                 current_tokens = 0
             
-            # Split the large chunk
-            from smart_utils import smart_split_text
-            sub_chunks = smart_split_text(chunk, max_tokens - 1000)
+            # Split the large chunk (reuse shared splitter)
+            from embed_utils import split_long_text
+            sub_chunks = split_long_text(chunk, max_tokens - 1000)
             for sub in sub_chunks:
                 groups.append([sub])
         elif current_tokens + chunk_tokens > max_tokens:

@@ -18,20 +18,24 @@ import git
 from dotenv import load_dotenv
 import signal
 import tiktoken
+from embed_utils import (
+    get_clients,
+    ensure_collection as _ensure_collection,
+    count_tokens,
+    simple_chunk_document,
+    group_chunks_for_voyage,
+    extract_timestamp,
+    should_skip_file,
+)
 
 # Load environment variables
 load_dotenv()
 
 # Initialize clients
-vo = voyageai.Client(api_key=os.environ["VOYAGE_API_KEY"])
-client = chromadb.PersistentClient(path="./chroma_db_v3")
+vo, client = get_clients()
 
 # Initialize tokenizer
 tokenizer = tiktoken.get_encoding("cl100k_base")
-
-def count_tokens(text: str) -> int:
-    """Count actual tokens using tiktoken."""
-    return len(tokenizer.encode(text))
 
 class EmbeddingState:
     """Manages embedding state for resumability."""
@@ -124,116 +128,7 @@ class EmbeddingState:
    Last run: {self.state.get('last_updated', 'Never')}
         """
 
-def simple_chunk_document(content: str, max_chunk_size: int = 8000) -> List[str]:
-    """
-    Simple, fast chunking that avoids recursion issues.
-    Splits on natural boundaries when possible.
-    """
-    if len(content) < max_chunk_size:
-        return [content]
-    
-    chunks = []
-    
-    # Try to split on paragraph boundaries first
-    paragraphs = content.split('\n\n')
-    current_chunk = ""
-    
-    for para in paragraphs:
-        # If single paragraph is too large, split it
-        if len(para) > max_chunk_size:
-            # Save current chunk if any
-            if current_chunk:
-                chunks.append(current_chunk)
-                current_chunk = ""
-            
-            # Split large paragraph by sentences or words
-            if '. ' in para:
-                sentences = para.split('. ')
-                for sent in sentences:
-                    if len(current_chunk) + len(sent) + 2 > max_chunk_size:
-                        if current_chunk:
-                            chunks.append(current_chunk)
-                        current_chunk = sent + '. '
-                    else:
-                        current_chunk += sent + '. '
-            else:
-                # Hard split by character count
-                for i in range(0, len(para), max_chunk_size):
-                    chunks.append(para[i:i+max_chunk_size])
-        elif len(current_chunk) + len(para) + 2 > max_chunk_size:
-            # Start new chunk
-            chunks.append(current_chunk)
-            current_chunk = para
-        else:
-            # Add to current chunk
-            if current_chunk:
-                current_chunk += "\n\n" + para
-            else:
-                current_chunk = para
-    
-    # Don't forget last chunk
-    if current_chunk:
-        chunks.append(current_chunk)
-    
-    return chunks
-
-def group_chunks_for_voyage(chunks: List[str], max_tokens: int = 30000) -> List[List[str]]:
-    """Group chunks for contextualized embedding, staying under token limit."""
-    groups = []
-    current_group = []
-    current_tokens = 0
-    
-    for chunk in chunks:
-        chunk_tokens = count_tokens(chunk)
-        
-        # If single chunk is too large, split it
-        if chunk_tokens > max_tokens:
-            # Save current group
-            if current_group:
-                groups.append(current_group)
-                current_group = []
-                current_tokens = 0
-            
-            # Split the large chunk
-            sub_chunks = simple_chunk_document(chunk, max_chunk_size=4000)
-            for sub in sub_chunks:
-                sub_tokens = count_tokens(sub)
-                if sub_tokens > max_tokens:
-                    # Still too large, create single-chunk group
-                    # Split even smaller
-                    words = sub.split()
-                    word_chunk = []
-                    word_tokens = 0
-                    for word in words:
-                        word_token = count_tokens(word)
-                        if word_tokens + word_token > max_tokens - 100:
-                            if word_chunk:
-                                groups.append([' '.join(word_chunk)])
-                            word_chunk = [word]
-                            word_tokens = word_token
-                        else:
-                            word_chunk.append(word)
-                            word_tokens += word_token
-                    if word_chunk:
-                        groups.append([' '.join(word_chunk)])
-                else:
-                    groups.append([sub])
-        elif current_tokens + chunk_tokens > max_tokens:
-            # Save current group and start new one
-            if current_group:
-                groups.append(current_group)
-            current_group = [chunk]
-            current_tokens = chunk_tokens
-        else:
-            # Add to current group
-            current_group.append(chunk)
-            current_tokens += chunk_tokens
-    
-    # Don't forget last group
-    if current_group:
-        groups.append(current_group)
-    
-    return groups
+## Removed duplicate chunking helpers; using embed_utils.simple_chunk_document and group_chunks_for_voyage
 
 def embed_file(
     file_path: Path,
