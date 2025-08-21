@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 import sqlite3
 
-# Check v3 state
-state_file = Path("embedding_state_v3.json")
+# Check state
+state_file = Path("var/state/knowledge_code_state.json")
 if state_file.exists():
     with open(state_file) as f:
         state = json.load(f)
@@ -31,8 +31,8 @@ if state_file.exists():
             print(f"    - {Path(f).name}: {info['error'][:100]}")
 
 # Check ChromaDB directly via SQLite
-print("\n📦 ChromaDB Collections (v3):")
-db_path = Path("chroma_db_v3/chroma.sqlite3")
+print("\n📦 ChromaDB Collections:")
+db_path = Path("chroma_db/chroma.sqlite3")
 if db_path.exists():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -56,9 +56,10 @@ if db_path.exists():
     conn.close()
 
 # Check what directories were targeted
-print("\n🎯 Target directories from embed_v3.py:")
-print("  - /realm/knowledgebase -> collection: knowledgebase")
-print("  - /realm/project/sinex -> collection: code")
+print("\n🎯 Target directories from embed_knowledge_code.py:")
+import os
+print(f"  - {os.environ.get('KB_DIR','data/knowledgebase')} -> collection: knowledgebase")
+print(f"  - {os.environ.get('CODE_DIR','data/code')} -> collection: code")
 
 # Analyze processed paths
 if state_file.exists():

@@ -41,7 +41,7 @@ from embed_utils import (
     CONTEXT_MODEL, EMBED_DIM
 )
 
-CSV_PATH = Path(os.environ.get('RAINDROP_CSV', 'raindrop_bookmarks_19_08_2025.csv'))
+CSV_PATH = Path(os.environ.get('RAINDROP_CSV', 'data/raindrop/raindrop_bookmarks_19_08_2025.csv'))
 tokenizer = tiktoken.get_encoding('cl100k_base')
 
 
@@ -88,7 +88,7 @@ def embed_bookmarks(
     col = _ensure_collection(client)
 
     # Simple resumable state of processed bookmark IDs
-    state_path = Path('raindrop_embed_state.json')
+    state_path = Path('var/state/raindrop_embed_state.json')
     processed_ids: Set[str] = set()
     if state_path.exists():
         try:
@@ -238,6 +238,7 @@ def embed_bookmarks(
             processed += 1
             processed_ids.add(bid)
             # Save state every 500 items
+            state_path.parent.mkdir(parents=True, exist_ok=True)
             if processed % 500 == 0:
                 try:
                     import json

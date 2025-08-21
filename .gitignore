@@ -6,16 +6,22 @@ __pycache__/
 # Chroma DBs and caches
 chroma_db/
 chroma_db_v*/
-logs/
+chroma_db_v3_corrupted/
+
+# New data/var layout
+data/**
+!data/README.md
+var/log/**
+var/state/**
+archive/**
 *.log
 .DS_Store
 
 # Local data and exports
-chatlog/
-raindrop_bookmarks_*.csv
+data/chatlog/
+data/raindrop/*.csv
 recovered_embeddings.json
 backup_legacy_*.jsonl
-raindrop_embed_state.json
 
 # State files
 *_state.json

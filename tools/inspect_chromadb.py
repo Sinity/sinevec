@@ -8,7 +8,7 @@ from pathlib import Path
 
 def inspect_database():
     """Inspect the database structure."""
-    db_path = "chroma_db_v3/chroma.sqlite3"
+    db_path = "chroma_db/chroma.sqlite3"
     
     if not Path(db_path).exists():
         print(f"❌ Database not found: {db_path}")

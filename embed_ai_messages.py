@@ -347,7 +347,7 @@ def main():
     print("🤖 AI Message-Level Embedding Pipeline")
     print("=" * 60)
 
-    base = Path("chatlog")
+    base = Path("data/chatlog")
     conversations: List[Dict] = []
 
     print("\n📚 Loading sources...")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Version 3 of embedding pipeline - fixes collection ID and recursion issues.
+Embed knowledgebase and code trees with Voyage contextualized embeddings.
+Resumable, simple chunking, and unified collection output.
 """
 
 import os
@@ -40,7 +41,7 @@ tokenizer = tiktoken.get_encoding("cl100k_base")
 class EmbeddingState:
     """Manages embedding state for resumability."""
     
-    def __init__(self, state_file: str = "embedding_state_v3.json"):
+    def __init__(self, state_file: str = "var/state/knowledge_code_state.json"):
         self.state_file = Path(state_file)
         self.state = self.load_state()
         self.token_usage = self.state.get('token_usage', {})
@@ -74,6 +75,7 @@ class EmbeddingState:
         self.state['last_updated'] = datetime.now().isoformat()
         
         # Write to temp file first then rename (atomic operation)
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
         temp_file = self.state_file.with_suffix('.tmp')
         with open(temp_file, 'w') as f:
             json.dump(self.state, f, indent=2)
@@ -313,13 +315,15 @@ def main():
     elif args.resume:
         print(state.get_resume_stats())
     
-    print(f"\n🚀 Voyage Embedding Pipeline v3")
+    print(f"\n🚀 Knowledge/Code Embedding Pipeline")
     print(f"⚡ No rate limiting (payment method added)")
     
-    # Define sources to embed
+    # Define sources to embed (env-configurable; defaults to repo data/)
+    kb_dir = Path(os.environ.get("KB_DIR", "data/knowledgebase"))
+    code_dir = Path(os.environ.get("CODE_DIR", "data/code"))
     sources = [
-        (Path("/realm/knowledgebase"), "knowledgebase"),
-        (Path("/realm/project/sinex"), "code"),
+        (kb_dir, "knowledgebase"),
+        (code_dir, "code"),
     ]
     
     # Scan all sources

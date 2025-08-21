@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Defaults
-DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db_v3")
+DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 UNIFIED = os.environ.get("CHROMA_COLLECTION", "unified")
 EMBED_DIM = int(os.environ.get("EMBED_OUTPUT_DIMENSION", "1024"))
 CONTEXT_MODEL = os.environ.get("VOYAGE_CONTEXT_MODEL", "voyage-context-3")

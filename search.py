@@ -18,7 +18,7 @@ load_dotenv()
 
 # Initialize clients
 vo = voyageai.Client(api_key=os.environ["VOYAGE_API_KEY"])
-client = chromadb.PersistentClient(path="./chroma_db_v3")
+client = chromadb.PersistentClient(path="./chroma_db")
 
 def search_unified(
     query: str,
@@ -125,10 +125,10 @@ def search_unified(
 
 def search_legacy(query: str, n_results: int = 10) -> List[Dict]:
     """Fallback to search old collections."""
-    # Embed the query
+    # Embed the query (contextualized by default)
     query_embedding = vo.embed(
         [query],
-        model="voyage-3",
+        model=os.environ.get("VOYAGE_QUERY_MODEL", "voyage-context-3"),
         input_type="query"
     ).embeddings[0]
     
