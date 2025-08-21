@@ -48,10 +48,10 @@ def search_unified(
         n_results: Number of results to return
     """
     
-    # Embed the query
+    # Embed the query (contextualized model for better alignment)
     query_embedding = vo.embed(
         [query],
-        model="voyage-3",
+        model=os.environ.get("VOYAGE_QUERY_MODEL", "voyage-context-3"),
         input_type="query"
     ).embeddings[0]
     

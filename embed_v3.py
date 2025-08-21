@@ -258,7 +258,7 @@ def embed_file(
 
 def scan_files(directory: Path, state: EmbeddingState) -> List[Path]:
     """Scan directory for files to process."""
-    from utils import should_skip_file
+    from embed_utils import should_skip_file
     
     files_to_process = []
     
