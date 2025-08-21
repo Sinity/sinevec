@@ -1,0 +1,23 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+
+# Chroma DBs and caches
+chroma_db/
+chroma_db_v*/
+logs/
+*.log
+.DS_Store
+
+# Local data and exports
+chatlog/
+raindrop_bookmarks_*.csv
+recovered_embeddings.json
+backup_legacy_*.jsonl
+raindrop_embed_state.json
+
+# State files
+*_state.json
+embedding_state*.json
+reddit_embed_state.json
