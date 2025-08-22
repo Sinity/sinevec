@@ -18,11 +18,17 @@ Data layout
 
 Quick start
 - Ensure `.env` contains `VOYAGE_API_KEY`.
-- AI chats: `python embed_ai_messages.py --platform all`
-- Raindrop: `python embed_raindrop_bookmarks.py` (reads `raindrop_bookmarks_19_08_2025.csv` by default)
-- Knowledgebase/code: `python embed_knowledge_code.py --resume`
-- Search: `python search.py "your query"`
+- Dev shell installs the package: `nix develop` (runs `pip install -e .`).
+- CLI:
+  - Search: `ve search "your query"`
+  - Bookmarks: `ve embed-bookmarks --csv data/raindrop/raindrop_bookmarks_19_08_2025.csv --limit 1000`
+  - Inspect DB: `ve inspect-db`
+- Scripts (still supported):
+  - AI chats: `python embed_ai_messages.py --platform all`
+  - Raindrop: `python embed_raindrop_bookmarks.py`
+  - Knowledgebase/code: `python embed_knowledge_code.py --resume`
+  - Search: `python search.py "your query"`
 
 Notes
 - This repo removed obsolete one-offs and legacy scripts. Only the above entry points are supported.
-- All embeddings target `chroma_db_v3` → `unified` with 1024‑dim vectors.
+- All embeddings target `chroma_db` → `unified` with 1024‑dim vectors.

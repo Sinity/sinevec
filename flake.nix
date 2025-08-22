@@ -46,7 +46,8 @@
             
             if [ ! -f .venv/installed ]; then
               echo "Installing dependencies..."
-              pip install -q voyageai chromadb langchain-text-splitters numpy tqdm python-dotenv gitpython tiktoken
+              pip install -q voyageai chromadb langchain-text-splitters numpy tqdm python-dotenv gitpython tiktoken typer pydantic
+              pip install -q -e .
               touch .venv/installed
             fi
             
