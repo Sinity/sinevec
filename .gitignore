@@ -13,6 +13,7 @@ data/**
 !data/README.md
 var/log/**
 var/state/**
+var/reports/**
 archive/**
 *.log
 .DS_Store

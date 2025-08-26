@@ -130,6 +130,69 @@ def audit_models(write_report: bool = typer.Option(True, "--write-report/--no-wr
         print(f"\nReport written: {md}")
 
 
+@app.command("backfill-models")
+def backfill_models(
+    categories: str = typer.Option("knowledgebase,code", "--categories", help="Comma-separated categories to backfill"),
+    model: str = typer.Option("voyage-context-3", "--model", help="Model name to write"),
+    apply: bool = typer.Option(False, "--apply", help="Actually write changes; otherwise dry-run"),
+):
+    """Backfill missing embedding_model metadata for selected categories.
+
+    NOTE: Defaults target knowledgebase and code which were produced with contextualized embeddings.
+    """
+    import sqlite3
+    from pathlib import Path
+
+    db_path = Path("chroma_db/chroma.sqlite3")
+    if not db_path.exists():
+        print("DB not found at chroma_db/chroma.sqlite3")
+        raise SystemExit(1)
+
+    cats = [c.strip() for c in categories.split(",") if c.strip()]
+    if not cats:
+        print("No categories specified")
+        raise SystemExit(2)
+
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+
+    # Count targets
+    q = (
+        "SELECT COUNT(DISTINCT e.id)\n"
+        "FROM embeddings e\n"
+        "LEFT JOIN embedding_metadata em_model ON em_model.id = e.id AND em_model.key='embedding_model'\n"
+        "JOIN embedding_metadata em_cat ON em_cat.id = e.id AND em_cat.key='category'\n"
+        f"WHERE em_model.id IS NULL AND em_cat.string_value IN ({','.join('?' for _ in cats)})"
+    )
+    cur.execute(q, cats)
+    (missing_count,) = cur.fetchone()
+    print(f"Missing embedding_model in categories {cats}: {missing_count}")
+
+    if missing_count == 0:
+        conn.close()
+        return
+
+    if not apply:
+        print("Dry-run. Use --apply to write metadata.")
+        conn.close()
+        return
+
+    print(f"Writing embedding_model='{model}' ...")
+    cur.execute("BEGIN")
+    ins = (
+        "INSERT INTO embedding_metadata (id, key, string_value)\n"
+        "SELECT DISTINCT e.id, 'embedding_model', ?\n"
+        "FROM embeddings e\n"
+        "LEFT JOIN embedding_metadata em_model ON em_model.id = e.id AND em_model.key='embedding_model'\n"
+        "JOIN embedding_metadata em_cat ON em_cat.id = e.id AND em_cat.key='category'\n"
+        f"WHERE em_model.id IS NULL AND em_cat.string_value IN ({','.join('?' for _ in cats)})"
+    )
+    cur.execute(ins, (model, *cats))
+    conn.commit()
+    print("Done.")
+    conn.close()
+
+
 @app.command("embed-bookmarks")
 def embed_bookmarks(csv: Path = typer.Option(Path("data/raindrop/raindrop_bookmarks_19_08_2025.csv"), "--csv"), limit: int = 0):
     processed, embedded, tokens = embed_bookmarks_csv(csv_path=csv, limit=limit)
