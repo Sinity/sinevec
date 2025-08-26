@@ -19,7 +19,7 @@ import git
 from dotenv import load_dotenv
 import signal
 import tiktoken
-from embed_utils import (
+from voyage_embeddings.embed_utils import (
     get_clients,
     ensure_collection as _ensure_collection,
     count_tokens,

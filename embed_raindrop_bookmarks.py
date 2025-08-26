@@ -35,7 +35,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from embed_utils import (
+from voyage_embeddings.embed_utils import (
     get_clients, ensure_collection as _ensure_collection,
     count_tokens, split_long_text, domain_of, contextual_windows,
     CONTEXT_MODEL, EMBED_DIM

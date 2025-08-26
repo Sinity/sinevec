@@ -119,3 +119,70 @@ def contextual_windows(texts: List[str], max_tokens: int = MAX_DOC_TOKENS, alway
             windows.append((start, end))
             start = end
     return windows
+
+
+# Chunking helpers
+def simple_chunk_document(content: str, max_chunk_size: int = 8000) -> List[str]:
+    """Split long content into roughly paragraph/sentence chunks under the limit."""
+    if len(content) < max_chunk_size:
+        return [content]
+    chunks: List[str] = []
+    paragraphs = content.split("\n\n")
+    current_chunk = ""
+    for para in paragraphs:
+        if len(para) > max_chunk_size:
+            if current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = ""
+            if ". " in para:
+                sentences = para.split(". ")
+                for sent in sentences:
+                    if len(current_chunk) + len(sent) + 2 > max_chunk_size:
+                        if current_chunk:
+                            chunks.append(current_chunk)
+                        current_chunk = sent + ". "
+                    else:
+                        current_chunk += sent + ". "
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk = ""
+                current_chunk = para
+        else:
+            if current_chunk:
+                current_chunk += "\n\n" + para
+            else:
+                current_chunk = para
+    if current_chunk:
+        chunks.append(current_chunk)
+    return chunks
+
+
+def group_chunks_for_voyage(chunks: List[str], max_tokens: int = MAX_DOC_TOKENS) -> List[List[str]]:
+    """Group chunks into windows under token limit for contextualized embedding."""
+    groups: List[List[str]] = []
+    current_group: List[str] = []
+    current_tokens = 0
+    for chunk in chunks:
+        chunk_tokens = count_tokens(chunk)
+        if chunk_tokens > max_tokens:
+            if current_group:
+                groups.append(current_group)
+                current_group = []
+                current_tokens = 0
+            for sub in simple_chunk_document(chunk, max_chunk_size=4000):
+                if count_tokens(sub) > max_tokens:
+                    groups.append([sub[:8000]])
+                else:
+                    groups.append([sub])
+        elif current_tokens + chunk_tokens > max_tokens:
+            if current_group:
+                groups.append(current_group)
+            current_group = [chunk]
+            current_tokens = chunk_tokens
+        else:
+            current_group.append(chunk)
+            current_tokens += chunk_tokens
+    if current_group:
+        groups.append(current_group)
+    return groups

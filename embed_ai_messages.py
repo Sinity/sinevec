@@ -44,7 +44,7 @@ from tqdm import tqdm
 
 load_dotenv()
 
-from embed_utils import (
+from voyage_embeddings.embed_utils import (
     get_clients, ensure_collection as _ensure_collection, count_tokens, detect_code,
     CONTEXT_MODEL, EMBED_DIM, MAX_DOC_TOKENS
 )
