@@ -1,23 +1,23 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Source: Python scripts live at the repo root (e.g., `embed_*.py`, `search*.py`, `hierarchical_chunker.py`, `utils.py`, `smart_utils.py`).
-- Data stores: `chroma_db*/` directories hold local ChromaDB collections (generated, git-ignored).
-- Logs & state: `logs/`, `*.log`, and `*_state.json` track progress and recoveries (git-ignored).
-- Environment: `flake.nix` provides a Nix dev shell and bootstraps `.venv`; secrets live in `.env`.
+- Source: library and CLI under `src/voyage_embeddings` (entrypoint: `ve`). Legacy scripts remain at repo root (`embed_*.py`, `search.py`).
+- Data stores: `chroma_db/` (current), older `chroma_db_*` are ignored.
+- Logs & state: `var/log/`, `var/state/` (git-ignored).
+- Environment: `flake.nix` provides a dev shell and bootstraps `.venv`; secrets live in `.env` (ignored).
 
 ## Build, Test, and Development Commands
-- Dev shell: `nix develop` — creates/activates `.venv`, installs deps (`voyageai`, `chromadb`, `langchain-text-splitters`, `numpy`, `tqdm`, `python-dotenv`, `gitpython`, `tiktoken`) and loads `VOYAGE_API_KEY` from `.env`.
-- Run embeddings: `python embed_everything.py`, `python embed_reddit.py`, `python embed_ai_conversations.py`, `python embed_v3.py`.
-- Search: `python search.py "your query"` or `python search_v2.py "your query"`.
-- Maintenance: `python inspect_chromadb.py`, `python migrate_chromadb.py`, `python recover_embeddings.py`, `python unify_collections.py`.
-- Quick check: `python simple_embed_test.py` — minimal end-to-end sanity test.
+- Dev shell: `nix develop` — creates/activates `.venv`, installs deps and the package, exposes `ve`.
+- Run embeddings (CLI): `ve embed-bookmarks --csv <path> [--limit N]`.
+- Search: `ve search "your query"` (use `--model` to override).
+- Maintenance: `ve inspect-db`, `ve audit-models`, `ve infer-category-models`.
+- Legacy scripts (optional): `python embed_ai_messages.py`, `python embed_raindrop_bookmarks.py`, `python embed_knowledge_code.py`.
 
 ## Coding Style & Naming Conventions
 - Python 3.11; follow PEP 8 with 4-space indentation and type hints where helpful.
-- Scripts: `verb_subject.py` (e.g., `embed_source.py`); utilities in `*_utils.py` or `utils.py`.
+- Scripts: `verb_subject.py` (e.g., `embed_source.py`); shared utilities live in `src/voyage_embeddings/embed_utils.py`.
 - Functions/vars use `snake_case`; classes use `CamelCase`; add short docstrings to new public functions.
-- Do not commit data, logs, or secrets (`.gitignore` covers `.env`, `.venv/`, `chroma_db/`, `logs/`, `*.log`).
+- Do not commit data, logs, or secrets (ignored: `.env`, `.venv/`, `chroma_db/`, `var/`, `*.log`).
 
 ## Testing Guidelines
 - Prefer small, runnable test scripts next to code (e.g., `something_test.py`), callable via `python file_test.py`.

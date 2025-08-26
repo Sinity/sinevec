@@ -118,3 +118,31 @@ def scan_files(directory: Path, state: EmbeddingState) -> List[Path]:
                 files.append(file_path)
     files.sort(key=lambda f: f.stat().st_size)
     return files
+
+
+def embed_knowledge_code_pipeline(kb_dir: Path, code_dir: Path, force: bool = False) -> Tuple[int, int]:
+    """Embed knowledgebase and code trees; returns (files_processed, tokens_used)."""
+    vo, client = get_clients()
+    state = EmbeddingState(state_file=Path("var/state/knowledge_code_state.json"))
+    sources = []
+    if kb_dir and kb_dir.exists():
+        sources.append((kb_dir, "knowledgebase"))
+    if code_dir and code_dir.exists():
+        sources.append((code_dir, "code"))
+    all_files: List[Tuple[Path, str]] = []
+    for src, cname in sources:
+        files = scan_files(src, state)
+        all_files.extend((f, cname) for f in files)
+    if not all_files:
+        return 0, state.token_usage.get('total', 0)
+    total_tokens = state.token_usage.get('total', 0)
+    processed = 0
+    for file_path, collection_name in all_files:
+        tokens = embed_file(vo, client, file_path, collection_name, state, force=force)
+        if tokens > 0:
+            total_tokens += tokens
+        processed += 1
+        if processed % 25 == 0:
+            state.save_state()
+    state.save_state()
+    return processed, total_tokens

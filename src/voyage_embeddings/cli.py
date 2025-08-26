@@ -7,7 +7,8 @@ import typer
 from voyage_embeddings.embed_utils import get_clients, ensure_collection
 from pathlib import Path
 from voyage_embeddings.ingest.bookmarks import embed_bookmarks_csv
-from voyage_embeddings.ingest.chats import embed_conversation_messages
+from voyage_embeddings.ingest.chats import embed_conversation_messages, embed_chats_pipeline
+from voyage_embeddings.ingest.knowledge_code import embed_knowledge_code_pipeline
 
 app = typer.Typer(help="Voyage Embeddings CLI")
 
@@ -16,7 +17,14 @@ app = typer.Typer(help="Voyage Embeddings CLI")
 def search_cmd(
     query: str,
     n: int = typer.Option(10, "--n"),
-    model: str | None = typer.Option(None, "--model", help="Override query model; defaults to VOYAGE_QUERY_MODEL or auto")
+    model: str | None = typer.Option(None, "--model", help="Override query model; defaults to VOYAGE_QUERY_MODEL or auto"),
+    category: str | None = typer.Option(None, "--category"),
+    subcategory: str | None = typer.Option(None, "--subcategory"),
+    channel: str | None = typer.Option(None, "--channel"),
+    date_from: str | None = typer.Option(None, "--date-from"),
+    date_to: str | None = typer.Option(None, "--date-to"),
+    has_code: bool = typer.Option(False, "--has-code"),
+    has_urls: bool = typer.Option(False, "--has-urls"),
 ):
     import voyageai, chromadb
     vo, client = get_clients()
@@ -35,8 +43,33 @@ def search_cmd(
         typer.echo("Hint: try --model voyage-2 or set VOYAGE_QUERY_MODEL.")
         raise typer.Exit(1)
 
+    # Build filter
+    where_filter = {}
+    conditions = []
+    if category:
+        conditions.append({"category": category})
+    if subcategory:
+        conditions.append({"subcategory": subcategory})
+    if channel:
+        conditions.append({"channel": channel})
+    if has_code:
+        conditions.append({"has_code": True})
+    if has_urls:
+        conditions.append({"has_urls": True})
+    if date_from or date_to:
+        df = {}
+        if date_from:
+            df["$gte"] = date_from
+        if date_to:
+            df["$lte"] = date_to
+        conditions.append({"date": df})
+    if len(conditions) == 1:
+        where_filter = conditions[0]
+    elif len(conditions) > 1:
+        where_filter = {"$and": conditions}
+
     try:
-        res = col.query(query_embeddings=[qv], n_results=n)
+        res = col.query(query_embeddings=[qv], n_results=n, where=where_filter or None)
     except Exception as e:
         typer.echo(f"Query error: {e}")
         raise typer.Exit(2)
@@ -51,6 +84,20 @@ def search_cmd(
         meta = res['metadatas'][0][i]
         print(meta)
         print(res['documents'][0][i][:300])
+
+
+@app.command("embed-chats")
+def embed_chats(platform: str = typer.Option("all", "--platform"), limit: int = typer.Option(0, "--limit")):
+    processed, embedded, tokens = embed_chats_pipeline(platform=platform, limit=limit)
+    print("\nDone:")
+    print(f" conversations={processed} messages_embedded={embedded} tokens={tokens}")
+
+
+@app.command("embed-knowledge")
+def embed_knowledge(kb_dir: Path = typer.Option(Path("data/knowledgebase"), "--kb-dir"), code_dir: Path = typer.Option(Path("data/code"), "--code-dir"), force: bool = typer.Option(False, "--force")):
+    processed, tokens = embed_knowledge_code_pipeline(kb_dir=kb_dir, code_dir=code_dir, force=force)
+    print("\nDone:")
+    print(f" files_processed={processed} tokens={tokens}")
 
 
 @app.command("audit-models")

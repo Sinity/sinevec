@@ -2,14 +2,12 @@
 
 Minimal, clean embedding pipelines using Voyage AI with a unified ChromaDB store.
 
-Core scripts
-- `embed_ai_messages.py`: Per-message embeddings for AI chats (ChatGPT/Claude/Cody) using `voyage-context-3`. Stores `granularity=message` in `unified`.
-- `embed_raindrop_bookmarks.py`: Per-bookmark contextualized embeddings (summary + highlights in one context). Stores `category=bookmarks` in `unified`.
-- `embed_knowledge_code.py`: Contextualized embedding for knowledgebase/code trees; resumable state and simple chunking. Uses `KB_DIR`/`CODE_DIR` or `data/knowledgebase` and `data/code`.
-- `search.py`: Search with metadata filters over `unified`.
+Core
+- Prefer the CLI (`ve ...`) for all workflows. See Quick start below.
+- Legacy scripts remain available: `embed_ai_messages.py`, `embed_raindrop_bookmarks.py`, `embed_knowledge_code.py`, and `search.py`.
 
 Shared utilities
-- `embed_utils.py` centralizes clients, tokenization, splitting, context windows, file helpers, and config (DB path, model, dimensions).
+- `src/voyage_embeddings/embed_utils.py` centralizes clients, tokenization, splitting, context windows, file helpers, and config (DB path, model, dimensions).
 
 Data layout
 - Vector DB: `chroma_db/` (single current DB)
