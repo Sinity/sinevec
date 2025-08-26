@@ -24,7 +24,7 @@ Quick start
   - `nix run .#ve -- ...` (no shell needed; use `--` before args)
   - `python -m voyage_embeddings.cli ...` (direct module run)
   - Examples:
-    - Search: `ve search "your query"`
+    - Search: `ve search "your query"` (use `--model` to override)
     - Bookmarks: `ve embed-bookmarks --csv data/raindrop/raindrop_bookmarks_19_08_2025.csv --limit 1000`
     - Inspect DB: `ve inspect-db`
 - Scripts (still supported):

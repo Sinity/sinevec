@@ -12,16 +12,26 @@ app = typer.Typer(help="Voyage Embeddings CLI")
 
 
 @app.command("search")
-def search_cmd(query: str, n: int = typer.Option(10, "--n")):
+def search_cmd(
+    query: str,
+    n: int = typer.Option(10, "--n"),
+    model: str | None = typer.Option(None, "--model", help="Override query model; defaults to VOYAGE_QUERY_MODEL or auto")
+):
     import voyageai, chromadb
     vo, client = get_clients()
     col = ensure_collection(client)
-    model = os.environ.get("VOYAGE_QUERY_MODEL", "voyage-2")
+    model = model or os.environ.get("VOYAGE_QUERY_MODEL") or os.environ.get("VOYAGE_CONTEXT_MODEL") or "voyage-2"
+
+    # Use contextualized endpoint when requesting a contextualized model
     try:
-        qv = vo.embed([query], model=model, input_type="query").embeddings[0]
+        if "context" in model:
+            ctx = vo.contextualized_embed(inputs=[[query]], model=model, input_type="query")
+            qv = ctx.results[0].embeddings[0]
+        else:
+            qv = vo.embed([query], model=model, input_type="query").embeddings[0]
     except Exception as e:
         typer.echo(f"Error embedding query with model '{model}': {e}")
-        typer.echo("Hint: set VOYAGE_QUERY_MODEL to a supported model, e.g. 'voyage-2'.")
+        typer.echo("Hint: try --model voyage-2 or set VOYAGE_QUERY_MODEL.")
         raise typer.Exit(1)
 
     try:
