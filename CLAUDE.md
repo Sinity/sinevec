@@ -35,8 +35,7 @@ python check_status.py              # View token usage and collection counts
 ### Search Operations
 ```bash
 # Interactive search interface
-python search.py                    # Enter interactive mode
-python search.py "query text"       # Direct search from command line
+ve search "query text"              # Direct search from command line
 
 # Specialized searches (in interactive mode)
 code: [query]                       # Search code collection only
@@ -91,7 +90,7 @@ voyage-embeddings/
 ├── embed_v3.py              # Main embedding pipeline (latest)
 ├── embed_v2.py              # Previous version (deprecated)
 ├── embed_everything.py      # Original version (deprecated)
-├── search.py                # Search interface
+├── (use CLI: ve search)    # Search interface
 ├── utils.py                 # Basic utilities
 ├── smart_utils.py          # Token-aware utilities
 ├── hierarchical_chunker.py # Content-aware chunking

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Source: library and CLI under `src/voyage_embeddings` (entrypoint: `ve`). Legacy scripts remain at repo root (`embed_*.py`, `search.py`).
+- Source: library and CLI under `src/voyage_embeddings` (entrypoint: `ve`).
 - Data stores: `chroma_db/` (current), older `chroma_db_*` are ignored.
 - Logs & state: `var/log/`, `var/state/` (git-ignored).
 - Environment: `flake.nix` provides a dev shell and bootstraps `.venv`; secrets live in `.env` (ignored).
@@ -11,7 +11,7 @@
 - Run embeddings (CLI): `ve embed-bookmarks --csv <path> [--limit N]`.
 - Search: `ve search "your query"` (use `--model` to override).
 - Maintenance: `ve inspect-db`, `ve audit-models`, `ve infer-category-models`.
-- Legacy scripts (optional): `python embed_ai_messages.py`, `python embed_raindrop_bookmarks.py`, `python embed_knowledge_code.py`.
+ 
 
 ## Coding Style & Naming Conventions
 - Python 3.11; follow PEP 8 with 4-space indentation and type hints where helpful.

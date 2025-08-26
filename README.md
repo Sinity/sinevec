@@ -4,7 +4,6 @@ Minimal, clean embedding pipelines using Voyage AI with a unified ChromaDB store
 
 Core
 - Prefer the CLI (`ve ...`) for all workflows. See Quick start below.
-- Legacy scripts remain available: `embed_ai_messages.py`, `embed_raindrop_bookmarks.py`, `embed_knowledge_code.py`, and `search.py`.
 
 Shared utilities
 - `src/voyage_embeddings/embed_utils.py` centralizes clients, tokenization, splitting, context windows, file helpers, and config (DB path, model, dimensions).
@@ -22,14 +21,11 @@ Quick start
   - `nix run .#ve -- ...` (no shell needed; use `--` before args)
   - `python -m voyage_embeddings.cli ...` (direct module run)
   - Examples:
-    - Search: `ve search "your query"` (use `--model` to override)
+    - Search: `ve search "your query"` (filters: `--category`, `--channel`, `--date-from`, etc.)
     - Bookmarks: `ve embed-bookmarks --csv data/raindrop/raindrop_bookmarks_19_08_2025.csv --limit 1000`
-    - Inspect DB: `ve inspect-db`
-- Scripts (still supported):
-  - AI chats: `python embed_ai_messages.py --platform all`
-  - Raindrop: `python embed_raindrop_bookmarks.py`
-  - Knowledgebase/code: `python embed_knowledge_code.py --resume`
-  - Search: `python search.py "your query"`
+    - Chats: `ve embed-chats --platform all --limit 200`
+    - Knowledge/Code: `ve embed-knowledge --kb-dir data/knowledgebase --code-dir data/code`
+    - Inspect/Audit: `ve inspect-db`, `ve audit-models`
 
 Notes
 - This repo removed obsolete one-offs and legacy scripts. Only the above entry points are supported.

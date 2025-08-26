@@ -56,7 +56,7 @@ if db_path.exists():
     conn.close()
 
 # Check what directories were targeted
-print("\n🎯 Target directories from embed_knowledge_code.py:")
+print("\n🎯 Target directories for knowledge/code:")
 import os
 print(f"  - {os.environ.get('KB_DIR','data/knowledgebase')} -> collection: knowledgebase")
 print(f"  - {os.environ.get('CODE_DIR','data/code')} -> collection: code")
