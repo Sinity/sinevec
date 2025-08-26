@@ -15,8 +15,8 @@ load_dotenv()
 DB_PATH = os.environ.get("CHROMA_DB_PATH", "./chroma_db")
 UNIFIED = os.environ.get("CHROMA_COLLECTION", "unified")
 EMBED_DIM = int(os.environ.get("EMBED_OUTPUT_DIMENSION", "1024"))
-# Defaults to widely-supported models; override via env if needed
-CONTEXT_MODEL = os.environ.get("VOYAGE_CONTEXT_MODEL", "voyage-2")
+# Defaults: contextualized uses 'voyage-context-3' unless overridden; standard uses 'voyage-2'
+CONTEXT_MODEL = os.environ.get("VOYAGE_CONTEXT_MODEL", "voyage-context-3")
 DEFAULT_MODEL = os.environ.get("VOYAGE_EMBED_MODEL", "voyage-2")
 MAX_DOC_TOKENS = int(os.environ.get("CONTEXT_DOC_TOKEN_LIMIT", "30000"))
 
