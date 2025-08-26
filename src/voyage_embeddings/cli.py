@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from voyage_embeddings.embed_utils import get_clients, ensure_collection
+from pathlib import Path
 from voyage_embeddings.ingest.bookmarks import embed_bookmarks_csv
 from voyage_embeddings.ingest.chats import embed_conversation_messages
 
