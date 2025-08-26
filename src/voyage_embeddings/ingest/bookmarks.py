@@ -130,7 +130,9 @@ def embed_bookmarks_csv(csv_path: Path, limit: int = 0) -> Tuple[int, int, int]:
                     add_ids.append(gid)
                     add_vecs.append(vec)
                     add_docs.append(inputs[0][i][:65536])
-                    add_meta.append(chunk_metas[s+i])
+                    meta = dict(chunk_metas[s+i])
+                    meta['embedding_model'] = CONTEXT_MODEL
+                    add_meta.append(meta)
                 if add_ids:
                     col.add(ids=add_ids, embeddings=add_vecs, documents=add_docs, metadatas=add_meta)
                     embedded += len(add_ids)
@@ -138,4 +140,3 @@ def embed_bookmarks_csv(csv_path: Path, limit: int = 0) -> Tuple[int, int, int]:
             processed += 1
 
     return processed, embedded, total_tokens
-

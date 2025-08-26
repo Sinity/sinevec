@@ -210,7 +210,8 @@ def embed_file(
                             "group_index": group_idx,
                             "chunk_index": chunk_idx,
                             "total_groups": len(chunk_groups),
-                            "embedded_at": datetime.now().isoformat()
+                            "embedded_at": datetime.now().isoformat(),
+                            "embedding_model": "voyage-context-3"
                         }],
                         ids=[chunk_id]
                     )

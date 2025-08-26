@@ -221,7 +221,9 @@ def embed_bookmarks(
                             add_ids.append(cid)
                             add_vecs.append(vec)
                             add_docs.append(inputs[0][i][:65536])
-                            add_metas.append(chunk_metas[global_idx])
+                            m = dict(chunk_metas[global_idx])
+                            m['embedding_model'] = CONTEXT_MODEL
+                            add_metas.append(m)
                         if add_ids:
                             col.add(ids=add_ids, embeddings=add_vecs, documents=add_docs, metadatas=add_metas)
                             embedded += len(add_ids)
@@ -229,7 +231,12 @@ def embed_bookmarks(
                     emb = vo.embed(chunk_texts, model='voyage-3', input_type='document')
                     vectors = emb.embeddings
                     total_tokens += int(getattr(emb, 'total_tokens', 0) or 0)
-                    col.add(ids=chunk_ids, embeddings=vectors, documents=[t[:65536] for t in chunk_texts], metadatas=chunk_metas)
+                    metas = []
+                    for m in chunk_metas:
+                        mm = dict(m)
+                        mm['embedding_model'] = 'voyage-3'
+                        metas.append(mm)
+                    col.add(ids=chunk_ids, embeddings=vectors, documents=[t[:65536] for t in chunk_texts], metadatas=metas)
                     embedded += len(chunk_ids)
             except Exception as e:
                 print(f"  ⚠️ Embed failed for bookmark {bid}: {str(e)[:200]}")

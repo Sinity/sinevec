@@ -94,7 +94,8 @@ def embed_file(vo, client, file_path: Path, collection_name: str, state: Embeddi
                     'group_index': group_idx,
                     'chunk_index': chunk_idx,
                     'total_groups': len(groups),
-                    'embedded_at': datetime.now().isoformat()
+                    'embedded_at': datetime.now().isoformat(),
+                    'embedding_model': 'voyage-context-3'
                 }], ids=[chunk_id])
             total_tokens += embeds.total_tokens
         if total_tokens > 0:
@@ -117,4 +118,3 @@ def scan_files(directory: Path, state: EmbeddingState) -> List[Path]:
                 files.append(file_path)
     files.sort(key=lambda f: f.stat().st_size)
     return files
-
