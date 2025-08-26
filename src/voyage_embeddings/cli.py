@@ -377,6 +377,221 @@ def infer_bookmark_models(
         print(f"Applied embedding_model to {len(write_ids)} vectors (confident per-chunk assignments).")
 
 
+@app.command("infer-category-models")
+def infer_category_models(
+    categories: str = typer.Option("bookmarks,knowledgebase,code,reddit,irc", "--categories", help="Comma-separated categories to process"),
+    sample_size: int = typer.Option(200, "--sample-size", help="Units to sample per category (bookmarks: bookmarks; kb/code: groups; others: chunks)"),
+    threshold: float = typer.Option(0.02, "--threshold", help="Similarity margin for decision per unit"),
+    apply_if_consistent: bool = typer.Option(False, "--apply-if-consistent", help="If all sampled units agree, backfill category with inferred model"),
+):
+    """Spot-check categories and auto-assign model if samples are unanimous.
+
+    - bookmarks: samples per-bookmark (summary + highlights)
+    - knowledgebase/code: samples per (source, group_index) group
+    - reddit/irc: samples per embedding (single-chunk heuristic)
+    """
+    import sqlite3
+    import os
+    from collections import defaultdict
+
+    vo, client = get_clients()
+    col = ensure_collection(client)
+
+    cats = [c.strip() for c in categories.split(',') if c.strip()]
+    results = {}
+
+    def decide_unit(std_vecs, ctx_vecs, stored_vecs):
+        deltas = []
+        for i in range(len(stored_vecs)):
+            s_std = _cosine(stored_vecs[i], std_vecs[i]) if std_vecs else 0.0
+            s_ctx = _cosine(stored_vecs[i], ctx_vecs[i]) if ctx_vecs and i < len(ctx_vecs) else 0.0
+            deltas.append(s_ctx - s_std)
+        if not deltas:
+            return 'uncertain', 0.0
+        d_sorted = sorted(deltas)
+        med = d_sorted[len(d_sorted)//2]
+        if med >= threshold:
+            return 'voyage-context-3', med
+        if med <= -threshold:
+            return 'voyage-3', med
+        return 'uncertain', med
+
+    db_path = Path("chroma_db/chroma.sqlite3")
+    if not db_path.exists():
+        print("DB not found at chroma_db/chroma.sqlite3")
+        raise SystemExit(1)
+
+    for cat in cats:
+        conn = sqlite3.connect(str(db_path))
+        cur = conn.cursor()
+        units = []
+        if cat == 'bookmarks':
+            cur.execute(
+                """
+                SELECT DISTINCT substr(em_src.string_value, length('raindrop://')+1) AS bid
+                FROM embedding_metadata em_cat
+                JOIN embedding_metadata em_src ON em_src.id = em_cat.id AND em_src.key='source' AND em_src.string_value LIKE 'raindrop://%'
+                WHERE em_cat.key='category' AND em_cat.string_value='bookmarks'
+                LIMIT ?
+                """,
+                (sample_size,),
+            )
+            units = [('bookmark', r[0]) for r in cur.fetchall()]
+        elif cat in ('knowledgebase', 'code'):
+            cur.execute(
+                """
+                SELECT em_src.string_value AS source, em_gi.int_value AS gidx
+                FROM embedding_metadata em_cat
+                JOIN embedding_metadata em_src ON em_src.id=em_cat.id AND em_src.key='source'
+                JOIN embedding_metadata em_gi ON em_gi.id=em_cat.id AND em_gi.key='group_index'
+                WHERE em_cat.key='category' AND em_cat.string_value=?
+                GROUP BY source, gidx
+                LIMIT ?
+                """,
+                (cat, sample_size),
+            )
+            units = [('kbcode_group', (r[0], int(r[1]))) for r in cur.fetchall()]
+        else:
+            cur.execute(
+                """
+                SELECT e.embedding_id
+                FROM embeddings e
+                JOIN embedding_metadata em_cat ON em_cat.id=e.id AND em_cat.key='category' AND em_cat.string_value=?
+                LIMIT ?
+                """,
+                (cat, sample_size),
+            )
+            units = [('single', r[0]) for r in cur.fetchall()]
+        conn.close()
+
+        if not units:
+            results[cat] = {'voyage-context-3':0,'voyage-3':0,'uncertain':0,'decision': 'no_data'}
+            continue
+
+        counts = defaultdict(int)
+        assignments = []
+
+        for kind, u in units:
+            if kind == 'bookmark':
+                where = {"source": f"raindrop://{u}"}
+                got = col.get(where=where, include=["documents","embeddings","metadatas"]) 
+                docs = got.get('documents') or []
+                metas = got.get('metadatas') or []
+                if not docs:
+                    counts['uncertain'] += 1
+                    continue
+                # order: summary first then highlights
+                items = []
+                for i in range(len(docs)):
+                    m = metas[i] or {}
+                    ft = m.get('file_type','')
+                    if ft=='bookmark_summary':
+                        key=(0,0,0)
+                    else:
+                        hi=int(m.get('highlight_index',0) or 0)
+                        pi=int(m.get('part_index',0) or 0)
+                        key=(1,hi,pi)
+                    items.append((key, docs[i], got['embeddings'][i]))
+                items.sort(key=lambda x: x[0])
+                cd = [it[1] for it in items]
+                sv = [it[2] for it in items]
+                # standard
+                try:
+                    std_vecs = vo.embed(cd, model=os.environ.get('VOYAGE_EMBED_MODEL','voyage-3'), input_type='document').embeddings
+                except Exception:
+                    std_vecs = None
+                # contextual windows
+                from voyage_embeddings.embed_utils import contextual_windows, CONTEXT_MODEL, EMBED_DIM
+                idx_to_ctx={}
+                try:
+                    for (s,e) in contextual_windows(cd, always_include_first=True):
+                        ctx = vo.contextualized_embed(inputs=[cd[s:e]], model=os.environ.get('VOYAGE_CONTEXT_MODEL', CONTEXT_MODEL), input_type='document', output_dimension=EMBED_DIM)
+                        vecs = ctx.results[0].embeddings if ctx.results else []
+                        for i,v in enumerate(vecs):
+                            idx=s+i
+                            if idx not in idx_to_ctx:
+                                idx_to_ctx[idx]=v
+                except Exception:
+                    pass
+                ctx_vecs=[idx_to_ctx.get(i) for i in range(len(cd))]
+                decision, _ = decide_unit(std_vecs, ctx_vecs, sv)
+                counts[decision]+=1
+                assignments.append(decision)
+            elif kind == 'kbcode_group':
+                source, gidx = u
+                got = col.get(where={"source": source, "group_index": gidx}, include=["documents","embeddings"]) 
+                docs = got.get('documents') or []
+                sv = got.get('embeddings') or []
+                if not docs:
+                    counts['uncertain']+=1
+                    continue
+                try:
+                    std_vecs = vo.embed(docs, model=os.environ.get('VOYAGE_EMBED_MODEL','voyage-3'), input_type='document').embeddings
+                except Exception:
+                    std_vecs = None
+                try:
+                    from voyage_embeddings.embed_utils import CONTEXT_MODEL, EMBED_DIM
+                    ctx = vo.contextualized_embed(inputs=[docs], model=os.environ.get('VOYAGE_CONTEXT_MODEL', CONTEXT_MODEL), input_type='document', output_dimension=EMBED_DIM)
+                    ctx_vecs = ctx.results[0].embeddings if ctx.results else []
+                except Exception:
+                    ctx_vecs=None
+                decision,_=decide_unit(std_vecs, ctx_vecs, sv)
+                counts[decision]+=1
+                assignments.append(decision)
+            else:
+                # single-chunk heuristic for reddit/irc
+                eid = u
+                got = col.get(ids=[eid], include=["documents","embeddings"]) 
+                if not got.get('ids'):
+                    counts['uncertain']+=1
+                    continue
+                doc = got['documents'][0]
+                sv = [got['embeddings'][0]]
+                try:
+                    std_vecs = vo.embed([doc], model=os.environ.get('VOYAGE_EMBED_MODEL','voyage-3'), input_type='document').embeddings
+                except Exception:
+                    std_vecs=None
+                try:
+                    from voyage_embeddings.embed_utils import CONTEXT_MODEL, EMBED_DIM
+                    ctx = vo.contextualized_embed(inputs=[[doc]], model=os.environ.get('VOYAGE_CONTEXT_MODEL', CONTEXT_MODEL), input_type='document', output_dimension=EMBED_DIM)
+                    ctx_vecs = [ctx.results[0].embeddings[0]] if ctx.results else None
+                except Exception:
+                    ctx_vecs=None
+                decision,_=decide_unit(std_vecs, ctx_vecs, sv)
+                counts[decision]+=1
+                assignments.append(decision)
+
+        unanimous = [k for k in ('voyage-context-3','voyage-3') if counts[k]>0 and counts['uncertain']==0 and counts[k]==sum(counts.values())]
+        decision = unanimous[0] if unanimous else 'inconclusive'
+        results[cat] = {**counts, 'decision': decision}
+
+        print(f"\nCategory {cat} sample results:")
+        for k in ('voyage-context-3','voyage-3','uncertain'):
+            print(f"- {k}: {counts[k]}")
+        print(f"Decision: {decision}")
+
+        if apply_if_consistent and decision in ('voyage-context-3','voyage-3'):
+            print(f"Applying backfill for category '{cat}' with model={decision} ...")
+            # Write for all items in category missing embedding_model
+            conn = sqlite3.connect(str(db_path))
+            cur = conn.cursor()
+            cur.execute("BEGIN")
+            cur.execute(
+                """
+                INSERT INTO embedding_metadata (id, key, string_value)
+                SELECT e.id, 'embedding_model', ?
+                FROM embeddings e
+                JOIN embedding_metadata em_cat ON em_cat.id=e.id AND em_cat.key='category' AND em_cat.string_value=?
+                LEFT JOIN embedding_metadata em ON em.id=e.id AND em.key='embedding_model'
+                WHERE em.id IS NULL
+                """,
+                (decision, cat),
+            )
+            conn.commit()
+            conn.close()
+            print("Backfill applied.")
+
+
 @app.command("embed-bookmarks")
 def embed_bookmarks(csv: Path = typer.Option(Path("data/raindrop/raindrop_bookmarks_19_08_2025.csv"), "--csv"), limit: int = 0):
     processed, embedded, tokens = embed_bookmarks_csv(csv_path=csv, limit=limit)
