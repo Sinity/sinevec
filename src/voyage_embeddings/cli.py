@@ -16,10 +16,27 @@ def search_cmd(query: str, n: int = typer.Option(10, "--n")):
     import voyageai, chromadb
     vo, client = get_clients()
     col = ensure_collection(client)
-    qv = vo.embed([query], model=os.environ.get("VOYAGE_QUERY_MODEL", "voyage-context-3"), input_type="query").embeddings[0]
-    res = col.query(query_embeddings=[qv], n_results=n)
-    for i in range(len(res['ids'][0])):
-        print(f"\n[{i+1}] {res['ids'][0][i]} :: {res['distances'][0][i]:.4f}")
+    model = os.environ.get("VOYAGE_QUERY_MODEL", "voyage-2")
+    try:
+        qv = vo.embed([query], model=model, input_type="query").embeddings[0]
+    except Exception as e:
+        typer.echo(f"Error embedding query with model '{model}': {e}")
+        typer.echo("Hint: set VOYAGE_QUERY_MODEL to a supported model, e.g. 'voyage-2'.")
+        raise typer.Exit(1)
+
+    try:
+        res = col.query(query_embeddings=[qv], n_results=n)
+    except Exception as e:
+        typer.echo(f"Query error: {e}")
+        raise typer.Exit(2)
+
+    ids = res.get('ids') or []
+    if not ids or not ids[0]:
+        typer.echo("No results found.")
+        raise typer.Exit(0)
+
+    for i in range(len(ids[0])):
+        print(f"\n[{i+1}] {ids[0][i]} :: {res['distances'][0][i]:.4f}")
         meta = res['metadatas'][0][i]
         print(meta)
         print(res['documents'][0][i][:300])
@@ -46,4 +63,3 @@ def inspect_db():
     cur.execute("SELECT COUNT(*) FROM embeddings")
     print("Embeddings:", cur.fetchone()[0])
     conn.close()
-
