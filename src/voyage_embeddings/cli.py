@@ -196,16 +196,27 @@ def backfill_models(
 
 def _cosine(a, b):
     import math
-    if not a or not b:
+    if a is None or b is None:
         return 0.0
-    if len(a) != len(b):
+    try:
+        la = len(a)
+        lb = len(b)
+    except Exception:
         return 0.0
-    dot = sum(x*y for x, y in zip(a, b))
-    na = math.sqrt(sum(x*x for x in a))
-    nb = math.sqrt(sum(y*y for y in b))
-    if na == 0 or nb == 0:
+    if la != lb:
         return 0.0
-    return dot / (na * nb)
+    dot = 0.0
+    na = 0.0
+    nb = 0.0
+    for x, y in zip(a, b):
+        x = float(x)
+        y = float(y)
+        dot += x * y
+        na += x * x
+        nb += y * y
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (math.sqrt(na) * math.sqrt(nb))
 
 
 @app.command("infer-bookmark-models")
