@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Portable CLI shim for the Voyage Embeddings project.
+# Portable CLI shim for the Sinevec project.
 # Works in the dev shell and regular venvs.
 
 # If a local venv exists, activate it (prefers project .venv)
@@ -15,6 +15,6 @@ export PYTHONPATH="$PWD/src:${PYTHONPATH-}"
 
 # Invoke the Typer app directly with a nice program name
 exec python - "$@" <<'PY'
-from voyage_embeddings.cli import app
-app(prog_name="ve")
+from sinevec.cli import app
+app(prog_name="sinevec")
 PY

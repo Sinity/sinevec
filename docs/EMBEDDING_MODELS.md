@@ -1,8 +1,6 @@
 # Embedding Models Inventory
 
-This document tracks which Voyage models are used across the local ChromaDB store and in the pipelines.
-
-Summary (generated via `ve audit-models` on this machine):
+This document tracks which Voyage models are used across the local Qdrant store and in the pipelines. The historical figures below were captured before the migration away from Chroma and remain for context:
 
 - By model:
   - voyage-context-3: 24,395 (conversations)
@@ -23,10 +21,8 @@ Notes:
 - Bookmarks pipeline now records `embedding_model` as either `voyage-context-3` (contextualized path) or `voyage-3` (fallback). Older entries remain without this field.
 
 Operational defaults (current):
-- Query default: `VOYAGE_QUERY_MODEL` (CLI `ve search`) can be set; if unset, the CLI auto‑routes and falls back to `voyage-2` for broad compatibility. You can force contextual with `--model voyage-context-3`.
-- Ingestion defaults: `VOYAGE_CONTEXT_MODEL` and `VOYAGE_EMBED_MODEL` (see `src/voyage_embeddings/embed_utils.py`). Override via environment to match your stored vectors.
+- Query default: `VOYAGE_QUERY_MODEL` (CLI `sinevec search`) can be set; if unset, the CLI auto‑routes and falls back to `voyage-2` for broad compatibility. You can force contextual with `--model voyage-context-3`.
+- Ingestion defaults: `VOYAGE_CONTEXT_MODEL` and `VOYAGE_EMBED_MODEL` (see `src/sinevec/embed_utils.py`). Override via environment to match your stored vectors.
 
-How to refresh this report:
-1) Run `ve audit-models` to print a fresh summary and write `var/reports/embedding_model_audit.md`.
-2) Update this document if notable changes occur (e.g., switching default models or re‑embedding).
-
+Refreshing this report:
+- The legacy `audit-models` CLI command has been retired with the Qdrant migration. If you need an updated breakdown, iterate over Qdrant payloads (see `tools/quick_stats.py` for an example) and update these counts manually.

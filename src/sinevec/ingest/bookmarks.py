@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 from typing import List, Dict, Tuple
 
-from voyage_embeddings.embed_utils import (
+from sinevec.embed_utils import (
     get_clients, ensure_collection, count_tokens, split_long_text, contextual_windows,
     CONTEXT_MODEL, EMBED_DIM, domain_of,
 )

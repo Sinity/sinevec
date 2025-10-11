@@ -2,8 +2,18 @@
 """Quick stats about embeddings."""
 
 import json
+import os
 from pathlib import Path
-import sqlite3
+
+from qdrant_client import QdrantClient
+
+from sinevec.embed_utils import (
+    QDRANT_API_KEY,
+    QDRANT_GRPC_PORT,
+    QDRANT_HOST,
+    QDRANT_HTTP_PORT,
+    QDRANT_HTTPS,
+)
 
 # Check state
 state_file = Path("var/state/knowledge_code_state.json")
@@ -30,34 +40,31 @@ if state_file.exists():
         for f, info in state['failed_files'].items():
             print(f"    - {Path(f).name}: {info['error'][:100]}")
 
-# Check ChromaDB directly via SQLite
-print("\n📦 ChromaDB Collections:")
-db_path = Path("chroma_db/chroma.sqlite3")
-if db_path.exists():
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Get collections
-    cursor.execute("SELECT name, id FROM collections")
-    collections = cursor.fetchall()
-    
-    for name, coll_id in collections:
-        # Count embeddings in each collection - check table structure first
+print("\n📦 Qdrant Collections:")
+client = QdrantClient(
+    host=QDRANT_HOST,
+    port=QDRANT_HTTP_PORT,
+    grpc_port=QDRANT_GRPC_PORT,
+    api_key=QDRANT_API_KEY,
+    https=QDRANT_HTTPS,
+)
+try:
+    collections = client.get_collections().collections or []
+    if not collections:
+        print("  (none)")
+    for col in collections:
+        name = col.name
         try:
-            cursor.execute("SELECT COUNT(*) FROM embeddings_queue WHERE collection_id = ?", (coll_id,))
-            count = cursor.fetchone()[0]
+            count = client.count(name, exact=True).count
+        except Exception as exc:  # pragma: no cover - diagnostic helper
+            print(f"  {name}: error ({exc})")
+        else:
             print(f"  {name}: {count} embeddings")
-        except sqlite3.OperationalError:
-            # Try alternate table structure
-            cursor.execute("SELECT COUNT(*) FROM embedding_metadata WHERE collection_id = ?", (coll_id,))
-            count = cursor.fetchone()[0]
-            print(f"  {name}: {count} embeddings")
-    
-    conn.close()
+except Exception as exc:
+    print(f"  Unable to query Qdrant: {exc}")
 
 # Check what directories were targeted
 print("\n🎯 Target directories for knowledge/code:")
-import os
 print(f"  - {os.environ.get('KB_DIR','data/knowledgebase')} -> collection: knowledgebase")
 print(f"  - {os.environ.get('CODE_DIR','data/code')} -> collection: code")
 

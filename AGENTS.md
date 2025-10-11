@@ -1,23 +1,23 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Source: library and CLI under `src/voyage_embeddings` (entrypoint: `ve`).
-- Data stores: `chroma_db/` (current), older `chroma_db_*` are ignored.
+- Source: library and CLI under `src/sinevec` (entrypoint: `sinevec`).
+- Vector store: Qdrant running locally (data under `/realm/data/qdrant`); the old `chroma_db/` directory is legacy-only.
 - Logs & state: `var/log/`, `var/state/` (git-ignored).
 - Environment: `flake.nix` provides a dev shell and bootstraps `.venv`; secrets live in `.env` (ignored).
 
 ## Build, Test, and Development Commands
-- Dev shell: `nix develop` — creates/activates `.venv`, installs deps and the package, exposes `ve`.
-- Run embeddings (CLI): `ve embed-bookmarks --csv <path> [--limit N]`.
-- Search: `ve search "your query"` (use `--model` to override).
-- Maintenance: `ve inspect-db`, `ve audit-models`, `ve infer-category-models`.
+- Dev shell: `nix develop` — creates/activates `.venv`, installs deps and the package, exposes `sinevec`.
+- Run embeddings (CLI): `sinevec embed-bookmarks --csv <path> [--limit N]`, `sinevec embed-chats`, `sinevec embed-knowledge`.
+- Search: `sinevec search "your query"` (use `--model` to override) or `sinevec serve` for the web UI.
+- Maintenance: `sinevec inspect-db` shows Qdrant collections/counts; additional QA commands live in `tools/`.
  
 
 ## Coding Style & Naming Conventions
 - Python 3.11; follow PEP 8 with 4-space indentation and type hints where helpful.
-- Scripts: `verb_subject.py` (e.g., `embed_source.py`); shared utilities live in `src/voyage_embeddings/embed_utils.py`.
+- Scripts: `verb_subject.py` (e.g., `embed_source.py`); shared utilities live in `src/sinevec/embed_utils.py`.
 - Functions/vars use `snake_case`; classes use `CamelCase`; add short docstrings to new public functions.
-- Do not commit data, logs, or secrets (ignored: `.env`, `.venv/`, `chroma_db/`, `var/`, `*.log`).
+- Do not commit data, logs, or secrets (ignored: `.env`, `.venv/`, `var/`, `*.log`); Qdrant data lives under `/realm/data/qdrant`.
 
 ## Testing Guidelines
 - Prefer small, runnable test scripts next to code (e.g., `something_test.py`), callable via `python file_test.py`.
@@ -30,4 +30,4 @@
 
 ## Security & Configuration Tips
 - Create `.env` with `VOYAGE_API_KEY=<your key>`; never commit `.env` or tokens.
-- Be careful with logs; avoid writing raw secrets. Large artifacts belong in `chroma_db*/` or `logs/` (already ignored).
+- Be careful with logs; avoid writing raw secrets. Large artifacts belong in `/realm/data/qdrant` (managed by the service) or `logs/` (already ignored).
