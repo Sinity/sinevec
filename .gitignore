@@ -28,3 +28,7 @@ backup_legacy_*.jsonl
 *_state.json
 embedding_state*.json
 reddit_embed_state.json
+
+# Local dev shell
+.direnv/
+.envrc

@@ -9,8 +9,8 @@
 ## Build, Test, and Development Commands
 - Dev shell: `nix develop` — creates/activates `.venv`, installs deps and the package, exposes `sinevec`.
 - Run embeddings (CLI): `sinevec embed-bookmarks --csv <path> [--limit N]`, `sinevec embed-chats`, `sinevec embed-knowledge`.
-- Search: `sinevec search "your query"` (use `--model` to override) or `sinevec serve` for the web UI.
-- Maintenance: `sinevec inspect-db` shows Qdrant collections/counts; additional QA commands live in `tools/`.
+- Search: `sinevec search "your query"` (use `--model` to override, `--json` for machine-readable output) or `sinevec serve` for the web UI.
+- Maintenance: `sinevec inspect-db` shows Qdrant collections/counts; `sinevec options` dumps indexed filters; additional QA commands live in `tools/`.
  
 
 ## Coding Style & Naming Conventions

@@ -554,36 +554,50 @@ def split_long_text(text: str, max_tokens: int = 8000) -> List[str]:
 
 
 def contextual_windows(texts: List[str], max_tokens: int = MAX_DOC_TOKENS, always_include_first: bool = True) -> List[Tuple[int, int]]:
-    toks = [count_tokens(t) for t in texts]
-    windows: List[Tuple[int, int]] = []
+    """Return inclusive-exclusive windows for grouping chunks under a token cap.
+
+    When ``always_include_first`` is True the first chunk (usually a summary)
+    is present in every window, with subsequent chunks packed while respecting
+    ``max_tokens``. Highlights that cannot fit alongside the summary are emitted
+    as standalone windows rather than looping forever.
+    """
     if not texts:
-        return windows
+        return []
+
+    tokens = [count_tokens(t) for t in texts]
+    windows: List[Tuple[int, int]] = []
+
     if always_include_first:
-        base_text = texts[0]
-        base_t = toks[0]
-        while True:
-            total = base_t
-            end = 1
-            while end < len(texts) and total + toks[end] <= max_tokens:
-                total += toks[end]
+        # Always emit at least the summary.
+        windows.append((0, min(len(texts), 1)))
+
+        index = 1
+        while index < len(texts):
+            total = tokens[0]
+            end = index
+            while end < len(texts) and total + tokens[end] <= max_tokens:
+                total += tokens[end]
                 end += 1
-            windows.append((0, end))
-            if end >= len(texts):
-                break
-            texts = [base_text] + texts[end:]
-            toks = [base_t] + toks[end:]
+            if end == index:
+                # Highlight (or chunk) does not fit with the summary; embed it on its own.
+                windows.append((index, index + 1))
+                index += 1
+            else:
+                windows.append((0, end))
+                index = end
     else:
         start = 0
         while start < len(texts):
             total = 0
             end = start
-            while end < len(texts) and total + toks[end] <= max_tokens:
-                total += toks[end]
+            while end < len(texts) and total + tokens[end] <= max_tokens:
+                total += tokens[end]
                 end += 1
             if end == start:
                 end += 1
             windows.append((start, end))
             start = end
+
     return windows
 
 

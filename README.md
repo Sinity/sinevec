@@ -21,12 +21,13 @@ Quick start
   - `nix run .#sinevec -- ...` (no shell needed; use `--` before args)
   - `python -m sinevec.cli ...` (direct module run)
   - Examples:
-    - Search: `sinevec search "your query"` (filters: `--category`, `--channel`, `--date-from`, etc.)
+    - Search: `sinevec search "your query"` (filters: `--category`, `--channel`, `--date-from`, etc.; add `--json` for machine-readable output)
     - Bookmarks: `sinevec embed-bookmarks --csv data/raindrop/raindrop_bookmarks_19_08_2025.csv --limit 1000`
     - Chats: `sinevec embed-chats --platform all --limit 200`
     - Knowledge/Code: `sinevec embed-knowledge --kb-dir data/knowledgebase --code-dir data/code`
     - Inspect: `sinevec inspect-db`
     - Serve UI: `sinevec serve`
+    - List indexed filters: `sinevec options [--category knowledgebase]`
 
 Vector store configuration
 - Qdrant connection is controlled via `QDRANT_HOST`, `QDRANT_HTTP_PORT`, `QDRANT_GRPC_PORT`, `QDRANT_API_KEY`, `QDRANT_VECTOR_SIZE` (defaults to 1024), and `QDRANT_CLIENT_TIMEOUT`.

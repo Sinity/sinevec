@@ -38,7 +38,8 @@ python check_status.py              # View token usage and collection counts
 
 ```bash
 # Interactive search interface
-sinevec search "query text"         # Direct search from command line
+sinevec search "query text"         # Direct search from command line (`--json` for machine output)
+sinevec options --category code     # List indexed filters (omit flag for full dump)
 
 # Specialized searches (in interactive mode)
 code: [query]                       # Search code collection only

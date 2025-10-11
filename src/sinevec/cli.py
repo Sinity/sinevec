@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -10,7 +11,6 @@ from typing import Any
 import typer
 
 from sinevec.embed_utils import (
-    UNIFIED,
     ensure_collection,
     get_clients,
     get_qdrant_http_client,
@@ -45,6 +45,7 @@ def search_cmd(
     has_urls: bool = typer.Option(False, "--has-urls"),
     details: bool = typer.Option(True, "--details/--no-details", help="Show per-result metadata cards"),
     reverse: bool = typer.Option(False, "--reverse", help="List farthest matches first"),
+    json_output: bool = typer.Option(False, "--json", help="Return raw JSON results instead of a table."),
 ):
     try:
         raw_results = run_search(
@@ -67,6 +68,10 @@ def search_cmd(
     if not raw_results:
         typer.echo("No results found. You may need to embed more content or adjust filters.")
         raise typer.Exit(0)
+
+    if json_output:
+        typer.echo(json.dumps(raw_results, indent=2, ensure_ascii=False))
+        raise typer.Exit()
 
     def _shorten_for_table(value: str, width: int = 48) -> str:
         if not value:
@@ -202,6 +207,67 @@ def embed_knowledge(
     typer.echo(f" files_processed={processed} tokens={tokens}")
 
 
+@app.command("options")
+def options_cmd(
+    category: str | None = typer.Option(None, "--category", help="Only show details for a single category."),
+    show_all: bool = typer.Option(False, "--show-all", help="When filtering, also show the aggregated __all__ subcategory list."),
+):
+    """List available categories, subcategories, and the indexed date range."""
+    from sinevec.server import load_option_cache
+
+    cache = load_option_cache()
+    categories = cache.get("categories") or []
+    subcategories = cache.get("subcategories") or {}
+    date_info = cache.get("date") or {}
+
+    if category:
+        if category not in categories and category not in subcategories:
+            typer.echo(f"Category '{category}' not found.")
+            raise typer.Exit(1)
+        typer.echo(f"Category: {category}")
+        subs = subcategories.get(category) or []
+        if subs:
+            for sub in subs:
+                typer.echo(f"  - {sub}")
+        else:
+            typer.echo("  (no subcategories indexed)")
+        if show_all:
+            global_subs = subcategories.get("__all__") or []
+            if global_subs:
+                typer.echo("\nAll subcategories:")
+                for sub in global_subs:
+                    typer.echo(f"  - {sub}")
+    else:
+        if categories:
+            typer.echo("Categories:")
+            for cat in categories:
+                typer.echo(f"  - {cat}")
+        else:
+            typer.echo("Categories: (none indexed)")
+
+        for cat in sorted(k for k in subcategories.keys() if k != "__all__"):
+            subs = subcategories.get(cat) or []
+            if subs:
+                typer.echo(f"Subcategories for {cat}:")
+                for sub in subs:
+                    typer.echo(f"  - {sub}")
+
+        global_subs = subcategories.get("__all__") or []
+        if global_subs:
+            typer.echo("\nAll subcategories:")
+            for sub in global_subs:
+                typer.echo(f"  - {sub}")
+
+    start = date_info.get("min")
+    end = date_info.get("max")
+    if start or end:
+        typer.echo("\nDate range:")
+        typer.echo(f"  From: {start or 'unknown'}")
+        typer.echo(f"  To:   {end or 'unknown'}")
+    else:
+        typer.echo("\nDate range: not recorded")
+
+
 @app.command("embed-bookmarks")
 def embed_bookmarks(csv: Path = typer.Option(Path("data/raindrop/raindrop_bookmarks_19_08_2025.csv"), "--csv"), limit: int = 0):
     processed, embedded, tokens = embed_bookmarks_csv(csv_path=csv, limit=limit)
@@ -233,6 +299,8 @@ def inspect_db(collection: str | None = typer.Option(None, "--collection", help=
         typer.echo("No collections present.")
         raise typer.Exit(0)
 
+    total_points = 0
+
     for info in collections:
         name = info.name
         typer.echo(f"\nCollection: {name}")
@@ -242,6 +310,7 @@ def inspect_db(collection: str | None = typer.Option(None, "--collection", help=
             typer.echo(f"  count: error ({exc})")
         else:
             typer.echo(f"  count: {count}")
+            total_points += count
 
         try:
             full = client.get_collection(name)
@@ -251,13 +320,13 @@ def inspect_db(collection: str | None = typer.Option(None, "--collection", help=
         if vectors and getattr(vectors, "size", None):
             typer.echo(f"  vector_size: {vectors.size}")
 
-        try:
-            status = client.get_collection(name)
-            optimizer = getattr(getattr(status, "status", None), "optimizer_status", None)
-            if optimizer:
-                typer.echo(f"  optimizer: {optimizer}")
-        except Exception:
-            pass
+        status = getattr(full, "status", None)
+        optimizer = getattr(status, "optimizer_status", None) if status else None
+        if optimizer:
+            typer.echo(f"  optimizer: {optimizer}")
+
+    if len(collections) > 1:
+        typer.echo(f"\nTotal points across collections: {total_points:,}")
 
 
 if __name__ == "__main__":  # pragma: no cover

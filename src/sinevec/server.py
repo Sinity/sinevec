@@ -10,7 +10,7 @@ from sinevec.embed_utils import UNIFIED, get_qdrant_http_client
 from sinevec.search_core import SearchError, run_search
 
 
-def _load_option_cache() -> dict[str, Any]:
+def load_option_cache() -> dict[str, Any]:
     client = get_qdrant_http_client()
     if client is None:
         return {"categories": [], "subcategories": {}, "date": {"min": None, "max": None}}
@@ -671,7 +671,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_option_cache = _load_option_cache()
+_option_cache = load_option_cache()
 
 
 @app.get("/", response_class=HTMLResponse)
