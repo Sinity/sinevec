@@ -12,13 +12,74 @@
       nixpkgs,
       flake-utils,
     }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        pythonPackages = pkgs.python311Packages;
-      in
-      {
+        basePythonPackages = pkgs.python311Packages;
+        pythonPackages = basePythonPackages // {
+          watchfiles = basePythonPackages.watchfiles.overridePythonAttrs (_: {
+            doCheck = false;
+          });
+        };
+
+        voyageaiPkg = pythonPackages.buildPythonPackage rec {
+          pname = "voyageai";
+          version = "0.3.4";
+          src = pkgs.fetchPypi {
+            inherit pname version;
+            sha256 = "b2a526a31859f21782a309d8c40b69d8d8c499308ed96e2d81a6e1b952431c23";
+          };
+          pyproject = true;
+          build-system = with pythonPackages; [
+            poetry-core
+          ];
+          propagatedBuildInputs = with pythonPackages; [
+            aiohttp
+            aiolimiter
+            langchain-text-splitters
+            numpy
+            pillow
+            pydantic
+            python-dotenv
+            requests
+            tenacity
+            tokenizers
+          ];
+        };
+
+        sinevecPackage = pythonPackages.buildPythonApplication {
+          pname = "sinevec";
+          version = "0.1.0";
+          src = ./.;
+          pyproject = true;
+          pyprojectToml = ./pyproject.toml;
+          nativeBuildInputs = with pythonPackages; [
+            setuptools
+            wheel
+            poetry-core
+          ];
+          propagatedBuildInputs = with pythonPackages; [
+            voyageaiPkg
+            qdrant-client
+            tiktoken
+            python-dotenv
+            typer
+            pydantic
+            fastapi
+            uvicorn
+          ];
+        };
+      in rec {
+        packages.default = sinevecPackage;
+        packages.sinevec = sinevecPackage;
+
+        apps.default = {
+          type = "app";
+          program = "${sinevecPackage}/bin/sinevec";
+        };
+
+        apps.sinevec = apps.default;
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             python311
@@ -78,35 +139,6 @@
               echo "🔑 Tip: add VOYAGE_API_KEY to .env for embeddings"
             fi
           '';
-        };
-        # Provide a nix app for one-liner execution
-        apps.sinevec = {
-          type = "app";
-          program =
-            (pkgs.writeShellApplication {
-              name = "sinevec";
-              runtimeInputs = [
-                pkgs.python311
-                pkgs.python311Packages.pip
-                pkgs.python311Packages.virtualenv
-              ];
-              text = ''
-                              set -euo pipefail
-                              if [ -z "''${VIRTUAL_ENV-}" ] && [ -f .venv/bin/activate ]; then
-                                # shellcheck disable=SC1091
-                                source .venv/bin/activate
-                              fi
-                              export PYTHONPATH="$PWD/src:''${PYTHONPATH-}"
-                              if [ -z "''${VOYAGE_API_KEY-}" ] && [ -f .env ]; then
-                                export VOYAGE_API_KEY="$(grep -E '^VOYAGE_API_KEY=' .env | tail -n1 | cut -d'=' -f2-)"
-                              fi
-                              python - "$@" <<'PY'
-                from sinevec.cli import app
-                app(prog_name="sinevec")
-                PY
-              '';
-            }).outPath
-            + "/bin/sinevec";
         };
       }
     );

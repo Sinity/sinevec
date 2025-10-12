@@ -27,6 +27,7 @@ Quick start
     - Knowledge/Code: `sinevec embed-knowledge --kb-dir data/knowledgebase --code-dir data/code`
     - Inspect: `sinevec inspect-db`
     - Serve UI: `sinevec serve`
+    - Build package: `nix build .#sinevec` (produces a runnable CLI binary in `result/bin/sinevec`)
     - List indexed filters: `sinevec options [--category knowledgebase]`
 
 Vector store configuration
