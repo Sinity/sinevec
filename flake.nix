@@ -15,9 +15,15 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        basePythonPackages = pkgs.python311Packages;
+        basePythonPackages = pkgs.python312Packages;
         pythonPackages = basePythonPackages // {
           watchfiles = basePythonPackages.watchfiles.overridePythonAttrs (_: {
+            doCheck = false;
+            preferWheel = true;
+            checkPhase = "echo skipping watchfiles tests";
+            pythonImportsCheck = [];
+          });
+          anyio = basePythonPackages.anyio.overridePythonAttrs (_: {
             doCheck = false;
           });
         };
@@ -82,7 +88,7 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            python311
+            python312
             pythonPackages.pip
             pythonPackages.virtualenv
             git
