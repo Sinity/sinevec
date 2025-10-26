@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 import os
 import re
@@ -20,7 +19,7 @@ except ImportError:  # pragma: no cover
 
 load_dotenv()
 
-UNIFIED = os.environ.get("QDRANT_COLLECTION", os.environ.get("CHROMA_COLLECTION", "unified"))
+UNIFIED = os.environ.get("QDRANT_COLLECTION", "unified")
 EMBED_DIM = int(os.environ.get("EMBED_OUTPUT_DIMENSION", "1024"))
 
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "127.0.0.1")
@@ -34,11 +33,34 @@ QDRANT_TIMEOUT = float(os.environ.get("QDRANT_CLIENT_TIMEOUT", "20.0"))
 DOC_PAYLOAD_KEY = "_document"
 EXTERNAL_ID_KEY = "_external_id"
 
-# Defaults: contextualized uses 'voyage-context-3' unless overridden; standard uses 'voyage-2'
+# Defaults: contextualized uses 'voyage-context-3' unless overridden; standard uses 'voyage-3'
 CONTEXT_MODEL = os.environ.get("VOYAGE_CONTEXT_MODEL", "voyage-context-3")
-DEFAULT_MODEL = os.environ.get("VOYAGE_EMBED_MODEL", "voyage-2")
+DEFAULT_MODEL = os.environ.get("VOYAGE_EMBED_MODEL", "voyage-3")
 MAX_DOC_TOKENS = int(os.environ.get("CONTEXT_DOC_TOKEN_LIMIT", "30000"))
 MAX_FILE_BYTES = int(os.environ.get("EMBED_MAX_FILE_BYTES", str(2 * 1024 * 1024)))
+
+def _xdg_base(env_name: str, fallback: Path) -> Path:
+    base = os.environ.get(env_name)
+    if base:
+        return Path(base).expanduser()
+    return fallback
+
+
+def _resolve_path(var_names: Sequence[str], default: Path) -> Path:
+    for name in var_names:
+        value = os.environ.get(name)
+        if value:
+            return Path(value).expanduser().resolve()
+    return default.expanduser().resolve()
+
+
+DEFAULT_DATA_ROOT = _xdg_base("XDG_DATA_HOME", Path.home() / ".local" / "share") / "sinevec"
+DEFAULT_STATE_DIR = _xdg_base("XDG_STATE_HOME", Path.home() / ".local" / "state") / "sinevec"
+DEFAULT_LOG_DIR = _xdg_base("XDG_STATE_HOME", Path.home() / ".local" / "state") / "sinevec" / "log"
+
+DATA_ROOT = _resolve_path(("SINEVEC_DATA_ROOT", "SINEVEC_DATA_DIR"), DEFAULT_DATA_ROOT)
+STATE_DIR = _resolve_path(("SINEVEC_STATE_DIR",), DEFAULT_STATE_DIR)
+LOG_DIR = _resolve_path(("SINEVEC_LOG_DIR",), DEFAULT_LOG_DIR)
 
 
 def _normalize_vector(vector: Sequence[float] | Iterable[float]) -> List[float]:
@@ -337,12 +359,6 @@ class VectorClient:
                 from_config = getattr(getattr(info, "config", None), "params", None)
                 current_size = getattr(getattr(from_config, "vectors", None), "size", None)
                 if current_size and int(current_size) != int(size):
-                    logging.warning(
-                        "Qdrant collection '%s' has size %s but requested %s; keeping existing size.",
-                        name,
-                        current_size,
-                        size,
-                    )
                     size = int(current_size)
                 else:
                     size = int(size)

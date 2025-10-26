@@ -3,11 +3,6 @@
 __pycache__/
 .venv/
 
-# Chroma DBs and caches
-chroma_db/
-chroma_db_v*/
-chroma_db_v3_corrupted/
-
 # New data/var layout
 data/**
 !data/README.md
@@ -22,12 +17,10 @@ archive/**
 data/chatlog/
 data/raindrop/*.csv
 recovered_embeddings.json
-backup_legacy_*.jsonl
 
 # State files
 *_state.json
 embedding_state*.json
-reddit_embed_state.json
 
 # Local dev shell
 .direnv/

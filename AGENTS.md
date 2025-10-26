@@ -2,15 +2,15 @@
 
 ## Project Structure & Module Organization
 - Source: library and CLI under `src/sinevec` (entrypoint: `sinevec`).
-- Vector store: Qdrant running locally (data under `/realm/data/qdrant`); the old `chroma_db/` directory is legacy-only.
-- Logs & state: `var/log/`, `var/state/` (git-ignored).
+- Vector store: Qdrant running locally (data under `/realm/data/qdrant`).
+- Logs & state: `SINEVEC_LOG_DIR` (default `~/.local/state/sinevec/log/`) and `SINEVEC_STATE_DIR` (default `~/.local/state/sinevec/`), both git-ignored.
 - Environment: `flake.nix` provides a dev shell and bootstraps `.venv`; secrets live in `.env` (ignored).
 
 ## Build, Test, and Development Commands
 - Dev shell: `nix develop` — creates/activates `.venv`, installs deps and the package, exposes `sinevec`.
-- Run embeddings (CLI): `sinevec embed-bookmarks --csv <path> [--limit N]`, `sinevec embed-chats`, `sinevec embed-knowledge`.
+- Run embeddings (CLI): `sinevec embed-bookmarks [--limit N --force]`, `sinevec embed-chats [--platform X --force]`, `sinevec embed-knowledge [--force]`.
 - Search: `sinevec search "your query"` (use `--model` to override, `--json` for machine-readable output) or `sinevec serve` for the web UI.
-- Maintenance: `sinevec inspect-db` shows Qdrant collections/counts; `sinevec options` dumps indexed filters; additional QA commands live in `tools/`.
+- Maintenance: `sinevec inspect-db` shows Qdrant collections/counts; `sinevec options` dumps indexed filters; `sinevec backfill-embedding-model` repairs legacy payloads; additional QA commands live in `tools/`.
  
 
 ## Coding Style & Naming Conventions
