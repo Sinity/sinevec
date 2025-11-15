@@ -17,6 +17,7 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
           pythonPackages = pkgs.python312Packages;
+          graphragPython = pkgs.python311;
 
           voyageaiPkg = pythonPackages.buildPythonPackage rec {
             pname = "voyageai";
@@ -65,6 +66,32 @@
               uvicorn
             ];
           };
+
+          pythonEnv = pkgs.python312.withPackages (ps:
+            [
+              voyageaiPkg
+            ]
+            ++ (with ps; [
+              qdrant-client
+              tiktoken
+              python-dotenv
+              typer
+              pydantic
+              fastapi
+              uvicorn
+              pip
+              setuptools
+            ])
+          );
+
+          graphragEnv = pkgs.python311.withPackages (ps:
+            with ps; [
+              pip
+              setuptools
+              wheel
+            ]
+          );
+
         in rec {
           packages.default = sinevecPackage;
           packages.sinevec = sinevecPackage;
@@ -77,21 +104,20 @@
           apps.sinevec = apps.default;
 
           devShells.default = pkgs.mkShell {
-            buildInputs = with pkgs; [
-              python312
-              pythonPackages.pip
-              pythonPackages.virtualenv
-              git
-              jq
-              ripgrep
-              fd
-              unzip
-              gcc
-              stdenv.cc.cc.lib
-              zlib
-              bzip2
-              openssl
-            ];
+            buildInputs =
+              [ pythonEnv ]
+              ++ (with pkgs; [
+                git
+                jq
+                ripgrep
+                fd
+                unzip
+                gcc
+                stdenv.cc.cc.lib
+                zlib
+                bzip2
+                openssl
+              ]);
 
             shellHook = ''
               set -euo pipefail
@@ -105,21 +131,7 @@
                 ]
               }:''${LD_LIBRARY_PATH-}
 
-              if [ ! -d .venv ]; then
-                echo "Creating virtual environment..."
-                python -m venv .venv
-              fi
-              source .venv/bin/activate
-
-              # Ensure dependencies and project are installed once
-              if [ ! -f .venv/installed ]; then
-                echo "Installing dependencies and project (editable)..."
-                pip install -q --upgrade pip
-                pip install -q voyageai qdrant-client python-dotenv tiktoken typer pydantic fastapi uvicorn
-                pip install -q -e .
-                touch .venv/installed || true
-              fi
-
+              export PYTHONPATH="$PWD/src:''${PYTHONPATH-}"
               # Add local tools to PATH (portable CLI shim)
               export PATH="$PWD/tools/bin:$PATH"
 
@@ -127,12 +139,107 @@
               if [ -z "''${VOYAGE_API_KEY-}" ] && [ -f .env ]; then
                 export VOYAGE_API_KEY="$(grep -E '^VOYAGE_API_KEY=' .env | tail -n1 | cut -d'=' -f2-)"
               fi
+              if [ -z "''${OPENAI_API_KEY-}" ] && [ -f .env ]; then
+                maybe_openai="$(grep -E '^OPENAI_API_KEY=' .env | tail -n1 | cut -d'=' -f2-)"
+                if [ -n "$maybe_openai" ]; then
+                  export OPENAI_API_KEY="$maybe_openai"
+                fi
+              fi
+
+              export GRAPHRAG_ROOT="''${GRAPHRAG_ROOT-$PWD/var/graphrag}"
+              if [ -z "''${GRAPHRAG_API_KEY-}" ] && [ -n "''${OPENAI_API_KEY-}" ]; then
+                export GRAPHRAG_API_KEY="$OPENAI_API_KEY"
+              fi
+              mkdir -p "$GRAPHRAG_ROOT"
+              export GRAPHRAG_VENV="$GRAPHRAG_ROOT/.venv"
+
+              if [ ! -x "$GRAPHRAG_VENV/bin/python" ]; then
+                echo "📦 Setting up GraphRAG virtualenv under $GRAPHRAG_VENV"
+                ${graphragPython}/bin/python3.11 -m venv "$GRAPHRAG_VENV"
+                "$GRAPHRAG_VENV/bin/pip" install --upgrade pip >/dev/null
+                "$GRAPHRAG_VENV/bin/pip" install "graphrag==2.7.0" >/dev/null
+              fi
+
+              export PATH="$GRAPHRAG_VENV/bin:$PATH"
 
               echo "🚀 Voyage embedding environment ready!"
               if [ -n "''${VOYAGE_API_KEY-}" ]; then
                 echo "🔑 API key loaded: ''${VOYAGE_API_KEY:0:10}..."
               else
                 echo "🔑 Tip: add VOYAGE_API_KEY to .env for embeddings"
+              fi
+              if command -v graphrag >/dev/null 2>&1; then
+                echo "🕸️  GraphRAG CLI available (root: $GRAPHRAG_ROOT)"
+              fi
+            '';
+          };
+
+          devShells.graphrag = pkgs.mkShell {
+            buildInputs =
+              [ graphragEnv ]
+              ++ (with pkgs; [
+                git
+                jq
+                ripgrep
+                fd
+                unzip
+                gcc
+                stdenv.cc.cc.lib
+                zlib
+                bzip2
+                openssl
+              ]);
+
+            shellHook = ''
+              set -euo pipefail
+
+              export LD_LIBRARY_PATH=${
+                pkgs.lib.makeLibraryPath [
+                  pkgs.stdenv.cc.cc.lib
+                  pkgs.zlib
+                  pkgs.bzip2
+                  pkgs.openssl
+                ]
+              }:''${LD_LIBRARY_PATH-}
+
+              export PYTHONPATH="$PWD/src:''${PYTHONPATH-}"
+              export PATH="$PWD/tools/bin:$PATH"
+
+              export GRAPHRAG_ROOT="''${GRAPHRAG_ROOT-$PWD/var/graphrag}"
+              mkdir -p "''${GRAPHRAG_ROOT}"
+              export GRAPHRAG_VENV="$GRAPHRAG_ROOT/.venv"
+
+              if [ -z "''${OPENAI_API_KEY-}" ] && [ -f .env ]; then
+                maybe_key="$(grep -E '^OPENAI_API_KEY=' .env | tail -n1 | cut -d'=' -f2-)"
+                if [ -n "$maybe_key" ]; then
+                  export OPENAI_API_KEY="$maybe_key"
+                fi
+              fi
+
+              if [ -z "''${GRAPHRAG_API_KEY-}" ] && [ -n "''${OPENAI_API_KEY-}" ]; then
+                export GRAPHRAG_API_KEY="$OPENAI_API_KEY"
+              fi
+
+              if [ ! -x "$GRAPHRAG_VENV/bin/python" ]; then
+                echo "📦 Installing GraphRAG CLI under $GRAPHRAG_VENV"
+                ${graphragPython}/bin/python3.11 -m venv "$GRAPHRAG_VENV"
+                "$GRAPHRAG_VENV/bin/pip" install --upgrade pip >/dev/null
+                "$GRAPHRAG_VENV/bin/pip" install "graphrag==2.7.0" >/dev/null
+              fi
+
+              export PATH="$GRAPHRAG_VENV/bin:$PATH"
+
+              echo "🕸️  GraphRAG environment ready (root: $GRAPHRAG_ROOT)"
+              if [ -n "''${OPENAI_API_KEY-}" ]; then
+                echo "🔑 OPENAI_API_KEY available"
+              fi
+              if [ -n "''${GRAPHRAG_API_KEY-}" ]; then
+                echo "🔑 GRAPHRAG_API_KEY set (defaults to OPENAI_API_KEY)"
+              else
+                echo "🔑 Set OPENAI_API_KEY or Azure equivalents before indexing"
+              fi
+              if command -v graphrag >/dev/null 2>&1; then
+                echo "🧠 GraphRAG CLI available via $(command -v graphrag)"
               fi
             '';
           };

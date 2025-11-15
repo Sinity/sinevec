@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="${GRAPHRAG_ROOT:-$PWD/var/graphrag}"
+FORCE=0
+
+usage() {
+  cat <<'EOF'
+Usage: graphrag-init [--root PATH] [--force]
+
+Bootstraps a GraphRAG workspace under var/graphrag (or GRAPHRAG_ROOT).
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --root)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --root" >&2
+        exit 1
+      fi
+      ROOT="$2"
+      shift 2
+      ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if ! command -v graphrag >/dev/null 2>&1; then
+  echo "GraphRAG CLI not found in PATH. Run 'nix develop' to install it." >&2
+  exit 1
+fi
+
+ROOT="$(python -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$ROOT")"
+mkdir -p "$ROOT"
+
+CONFIG="$ROOT/settings.yaml"
+INIT_ARGS=(init --root "$ROOT" --force)
+if [[ -f "$CONFIG" && $FORCE -eq 0 ]]; then
+  echo "GraphRAG config already exists at $CONFIG (use --force to recreate)."
+else
+  echo "Initializing GraphRAG workspace at $ROOT"
+  graphrag "${INIT_ARGS[@]}"
+fi
+
+INPUT_DIR="$ROOT/input"
+mkdir -p "$INPUT_DIR"
+SAMPLE="$INPUT_DIR/sanity.txt"
+if [[ ! -s "$SAMPLE" ]]; then
+  cat >"$SAMPLE" <<'EOF'
+Sinevec GraphRAG demo document.
+
+This file seeds the GraphRAG pipeline with a short blurb so you can run:
+
+  graphrag index --root $GRAPHRAG_ROOT
+  graphrag query --root $GRAPHRAG_ROOT --method local --query "What is Sinevec?"
+
+Replace this file with your own corpus to build a local knowledge graph.
+EOF
+  echo "Wrote sample input to $SAMPLE"
+fi
+
+echo "GraphRAG workspace ready at $ROOT"

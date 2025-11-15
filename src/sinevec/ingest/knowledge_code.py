@@ -9,6 +9,7 @@ import signal
 from sinevec.embed_utils import (
     CONTEXT_MODEL,
     EMBED_DIM,
+    STATE_DIR,
     detect_code,
     get_clients,
     ensure_collection,
@@ -22,6 +23,9 @@ class EmbeddingState:
     def __init__(self, state_file: Path):
         self.state_file = state_file
         self.state = self.load_state()
+        if 'created_at' not in self.state:
+            self.state['created_at'] = datetime.now().isoformat()
+        self.state.setdefault('last_updated', self.state['created_at'])
         self.token_usage = self.state.get('token_usage', {})
         self.processed_files = set(self.state.get('processed_files', []))
         self.failed_files = self.state.get('failed_files', {})
@@ -174,7 +178,7 @@ def scan_files(directory: Path, state: EmbeddingState, force: bool) -> List[Path
 def embed_knowledge_code_pipeline(kb_dir: Path, code_dir: Path, force: bool = False) -> Tuple[int, int]:
     """Embed knowledgebase and code trees; returns (files_processed, tokens_used)."""
     vo, client = get_clients()
-    state = EmbeddingState(state_file=Path("var/state/knowledge_code_state.json"))
+    state = EmbeddingState(state_file=STATE_DIR / "knowledge_code_state.json")
     collection = ensure_collection(client)
     sources = []
     if kb_dir and kb_dir.exists():

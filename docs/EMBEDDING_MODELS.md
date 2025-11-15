@@ -1,28 +1,35 @@
 # Embedding Models Inventory
 
-This document tracks which Voyage models are used across the local Qdrant store and in the pipelines. The historical figures below were captured before the migration away from Chroma and remain for context:
+Sinevec now records the embedding model name for every new vector that lands in Qdrant.
 
-- By model:
-  - voyage-context-3: 24,395 (conversations)
-  - <missing>: 46,704 (bookmarks, reddit, irc, knowledgebase, code)
+## Current defaults
 
-- By model x category (top):
-  - voyage-context-3 × conversations: 24,395
-  - <missing> × bookmarks: 23,263
-  - <missing> × reddit: 14,902
-  - <missing> × irc: 4,301
-  - <missing> × knowledgebase: 2,349
-  - <missing> × code: 1,889
+- **Contextual pipelines** (chats, knowledgebase, code, bookmarks): `voyage-context-3`
+- **Standard embeddings / fallbacks**: `voyage-3`
+- **Search queries** default to `VOYAGE_QUERY_MODEL` if set, otherwise `voyage-context-3`.
 
-Notes:
-- Conversations (ChatGPT/Claude/Cody) are embedded with `voyage-context-3` (contextualized, 32K context).
-- Prior bookmark/code/knowledgebase runs didn’t record `embedding_model` in metadata; the audit lists them as `<missing>`.
-- Knowledgebase/code pipelines have been using `voyage-context-3`; starting now they also record `embedding_model`.
-- Bookmarks pipeline now records `embedding_model` as either `voyage-context-3` (contextualized path) or `voyage-3` (fallback). Older entries remain without this field.
+Adjust these via environment variables:
 
-Operational defaults (current):
-- Query default: `VOYAGE_QUERY_MODEL` (CLI `sinevec search`) can be set; if unset, the CLI auto‑routes and falls back to `voyage-2` for broad compatibility. You can force contextual with `--model voyage-context-3`.
-- Ingestion defaults: `VOYAGE_CONTEXT_MODEL` and `VOYAGE_EMBED_MODEL` (see `src/sinevec/embed_utils.py`). Override via environment to match your stored vectors.
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `VOYAGE_CONTEXT_MODEL` | contextual ingestion | `voyage-context-3` |
+| `VOYAGE_EMBED_MODEL` | non-contextual ingestion fallback | `voyage-3` |
+| `VOYAGE_QUERY_MODEL` | search queries | (inherits contextual default) |
 
-Refreshing this report:
-- The legacy `audit-models` CLI command has been retired with the Qdrant migration. If you need an updated breakdown, iterate over Qdrant payloads (see `tools/quick_stats.py` for an example) and update these counts manually.
+## Backfilling legacy vectors
+
+Older points (pre-Qdrant migration) may still have a missing `embedding_model` payload. Use the CLI helper to fill these gaps in-place:
+
+```bash
+# Dry run – see how many vectors would be updated
+sinevec backfill-embedding-model --dry-run
+
+# Apply updates, forcing bookmarks to record voyage-3 explicitly
+sinevec backfill-embedding-model --category bookmarks --model voyage-3
+```
+
+The command iterates through the `unified` collection and updates only records missing the field. Restrict by `--collection`, `--category`, or `--model` as needed.
+
+## Auditing live totals
+
+Run `python tools/quick_stats.py` to print the latest embedding counts, token usage, and per-source summaries. The script reads from the state files managed by the ingestion pipelines and from Qdrant directly. Update the script if you introduce new pipelines or metadata fields.

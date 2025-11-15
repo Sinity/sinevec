@@ -11,6 +11,9 @@ from typing import Any
 import typer
 
 from sinevec.embed_utils import (
+    CONTEXT_MODEL,
+    DATA_ROOT,
+    DEFAULT_MODEL,
     ensure_collection,
     get_clients,
     get_qdrant_http_client,
@@ -190,16 +193,20 @@ def serve_cmd(
 
 
 @app.command("embed-chats")
-def embed_chats(platform: str = typer.Option("all", "--platform"), limit: int = typer.Option(0, "--limit")):
-    processed, embedded, tokens = embed_chats_pipeline(platform=platform, limit=limit)
+def embed_chats(
+    platform: str = typer.Option("all", "--platform"),
+    limit: int = typer.Option(0, "--limit"),
+    force: bool = typer.Option(False, "--force"),
+):
+    processed, embedded, tokens = embed_chats_pipeline(platform=platform, limit=limit, force=force)
     typer.echo("\nDone:")
-    typer.echo(f" conversations={processed} messages_embedded={embedded} tokens={tokens}")
+    typer.echo(f" conversations_embedded={processed} message_segments={embedded} tokens={tokens}")
 
 
 @app.command("embed-knowledge")
 def embed_knowledge(
-    kb_dir: Path = typer.Option(Path("data/knowledgebase"), "--kb-dir"),
-    code_dir: Path = typer.Option(Path("data/code"), "--code-dir"),
+    kb_dir: Path = typer.Option(DATA_ROOT / "knowledgebase", "--kb-dir"),
+    code_dir: Path = typer.Option(DATA_ROOT / "code", "--code-dir"),
     force: bool = typer.Option(False, "--force"),
 ):
     processed, tokens = embed_knowledge_code_pipeline(kb_dir=kb_dir, code_dir=code_dir, force=force)
@@ -269,10 +276,70 @@ def options_cmd(
 
 
 @app.command("embed-bookmarks")
-def embed_bookmarks(csv: Path = typer.Option(Path("data/raindrop/raindrop_bookmarks_19_08_2025.csv"), "--csv"), limit: int = 0):
-    processed, embedded, tokens = embed_bookmarks_csv(csv_path=csv, limit=limit)
+def embed_bookmarks(
+    csv: Path = typer.Option(DATA_ROOT / "raindrop" / "raindrop_bookmarks_19_08_2025.csv", "--csv"),
+    limit: int = typer.Option(0, "--limit"),
+    force: bool = typer.Option(False, "--force"),
+):
+    processed, embedded, tokens = embed_bookmarks_csv(csv_path=csv, limit=limit, force=force)
     typer.echo("\nDone:")
     typer.echo(f" processed={processed} embedded={embedded} tokens={tokens}")
+
+
+@app.command("backfill-embedding-model")
+def backfill_embedding_model(
+    model: str | None = typer.Option(None, "--model", help="Model name to set when missing (defaults based on category)."),
+    category: str | None = typer.Option(None, "--category", help="Only update points from this category."),
+    collection: str = typer.Option("unified", "--collection", help="Target Qdrant collection."),
+    batch_size: int = typer.Option(512, "--batch-size", help="Number of points to scan per request."),
+    dry_run: bool = typer.Option(True, "--dry-run/--apply", help="Preview changes without writing to Qdrant."),
+):
+    """Populate the `embedding_model` payload for legacy vectors."""
+    _, client = get_clients()
+    vector_collection = ensure_collection(client, collection)
+    qclient = vector_collection.client
+
+    updated = 0
+    scanned = 0
+    offset = None
+
+    while True:
+        records, offset = qclient.scroll(
+            collection_name=collection,
+            with_payload=True,
+            with_vectors=False,
+            limit=batch_size,
+            offset=offset,
+        )
+        if not records:
+            break
+        for record in records:
+            payload = record.payload or {}
+            scanned += 1
+            if payload.get("embedding_model"):
+                continue
+            if category and payload.get("category") != category:
+                continue
+            target_model = model
+            if not target_model:
+                if (payload.get("category") or "").lower() in {"conversations", "chatgpt", "claude", "cody"}:
+                    target_model = CONTEXT_MODEL
+                else:
+                    target_model = DEFAULT_MODEL or CONTEXT_MODEL
+            if dry_run:
+                updated += 1
+                continue
+            qclient.set_payload(
+                collection_name=collection,
+                payload={"embedding_model": target_model},
+                points=[record.id],
+            )
+            updated += 1
+        if offset is None:
+            break
+
+    action = "would update" if dry_run else "updated"
+    typer.echo(f"{action} {updated} vectors (scanned {scanned}).")
 
 
 @app.command("inspect-db")

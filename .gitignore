@@ -6,9 +6,7 @@ __pycache__/
 # New data/var layout
 data/**
 !data/README.md
-var/log/**
-var/state/**
-var/reports/**
+var/**
 archive/**
 *.log
 .DS_Store

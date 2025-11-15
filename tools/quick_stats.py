@@ -2,12 +2,13 @@
 """Quick stats about embeddings."""
 
 import json
-import os
 from pathlib import Path
 
 from qdrant_client import QdrantClient
 
 from sinevec.embed_utils import (
+    DATA_ROOT,
+    STATE_DIR,
     QDRANT_API_KEY,
     QDRANT_GRPC_PORT,
     QDRANT_HOST,
@@ -15,74 +16,101 @@ from sinevec.embed_utils import (
     QDRANT_HTTPS,
 )
 
-# Check state
-state_file = Path("var/state/knowledge_code_state.json")
-if state_file.exists():
-    with open(state_file) as f:
-        state = json.load(f)
-    
-    print("📊 V3 Embedding State:")
-    print(f"  Created: {state['created_at'][:19]}")
-    print(f"  Last updated: {state['last_updated'][:19]}")
-    print(f"  Total tokens used: {state['token_usage']['total']:,}")
-    print(f"  Files processed: {len(state['processed_files'])}")
-    print(f"  Failed files: {len(state['failed_files'])}")
-    
-    # Sample of processed files
-    processed = list(state['processed_files'])[:10]
-    print("\n  Sample processed files:")
-    for f in processed:
-        print(f"    - {Path(f).name}")
-    
-    # Failed files
-    if state['failed_files']:
-        print("\n  Failed files:")
-        for f, info in state['failed_files'].items():
-            print(f"    - {Path(f).name}: {info['error'][:100]}")
 
-print("\n📦 Qdrant Collections:")
-client = QdrantClient(
-    host=QDRANT_HOST,
-    port=QDRANT_HTTP_PORT,
-    grpc_port=QDRANT_GRPC_PORT,
-    api_key=QDRANT_API_KEY,
-    https=QDRANT_HTTPS,
-)
-try:
-    collections = client.get_collections().collections or []
-    if not collections:
-        print("  (none)")
-    for col in collections:
-        name = col.name
-        try:
-            count = client.count(name, exact=True).count
-        except Exception as exc:  # pragma: no cover - diagnostic helper
-            print(f"  {name}: error ({exc})")
-        else:
-            print(f"  {name}: {count} embeddings")
-except Exception as exc:
-    print(f"  Unable to query Qdrant: {exc}")
+def load_json(path: Path):
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return None
+    except Exception as exc:  # pragma: no cover - diagnostics
+        print(f"⚠️  Unable to read {path}: {exc}")
+        return None
 
-# Check what directories were targeted
-print("\n🎯 Target directories for knowledge/code:")
-print(f"  - {os.environ.get('KB_DIR','data/knowledgebase')} -> collection: knowledgebase")
-print(f"  - {os.environ.get('CODE_DIR','data/code')} -> collection: code")
 
-# Analyze processed paths
-if state_file.exists():
-    kb_files = [f for f in state['processed_files'] if '/knowledgebase/' in f]
-    code_files = [f for f in state['processed_files'] if '/project/sinex' in f]
-    
-    print(f"\n📁 Files by source:")
-    print(f"  Knowledgebase: {len(kb_files)} files")
-    print(f"  Sinex code: {len(code_files)} files")
-    
-    # File types
-    extensions = {}
-    for f in state['processed_files']:
-        ext = Path(f).suffix or 'no_extension'
-        extensions[ext] = extensions.get(ext, 0) + 1
-    
-    print(f"\n📄 File types processed:")
-    for ext, count in sorted(extensions.items(), key=lambda x: x[1], reverse=True)[:10]:
-        print(f"  {ext}: {count} files")
+def summarise_bookmarks() -> None:
+    state = load_json(STATE_DIR / "raindrop_embed_state.json")
+    print("📚 Bookmarks:")
+    if not state:
+        print("  (no state file)")
+        return
+    processed = len(state.get("processed_ids", []))
+    failed = len(state.get("failed", {}))
+    tokens = int(state.get("token_usage", 0))
+    print(f"  Processed IDs: {processed}")
+    print(f"  Failed IDs: {failed}")
+    print(f"  Token usage: {tokens:,}")
+
+
+def summarise_chats() -> None:
+    state = load_json(STATE_DIR / "chat_embed_state.json")
+    print("\n💬 Chats:")
+    if not state:
+        print("  (no state file)")
+        return
+    processed = sum(len(p or {}) for p in state.get("processed", {}).values())
+    failed = len(state.get("failed", {}))
+    tokens = int(state.get("token_usage", 0))
+    print(f"  Conversations embedded: {processed}")
+    print(f"  Failed conversations: {failed}")
+    print(f"  Token usage: {tokens:,}")
+
+
+def summarise_knowledge() -> None:
+    state = load_json(STATE_DIR / "knowledge_code_state.json")
+    print("\n🧠 Knowledge / Code:")
+    if not state:
+        print("  (no state file)")
+        return
+    processed_files = state.get("processed_files", [])
+    failed_files = state.get("failed_files", {})
+    token_usage = state.get("token_usage", {})
+    total_tokens = token_usage.get("total", token_usage if isinstance(token_usage, int) else 0)
+    created = state.get("created_at")
+    updated = state.get("last_updated")
+    print(f"  Files processed: {len(processed_files)}")
+    print(f"  Failed files: {len(failed_files)}")
+    if created:
+        print(f"  Created: {created}")
+    if updated:
+        print(f"  Last updated: {updated}")
+    print(f"  Token usage: {total_tokens:,}")
+    if processed_files:
+        sample = list(processed_files)[:5]
+        print("  Sample:")
+        for entry in sample:
+            print(f"    - {Path(entry).name}")
+
+
+def summarise_qdrant() -> None:
+    print("\n📦 Qdrant Collections:")
+    client = QdrantClient(
+        host=QDRANT_HOST,
+        port=QDRANT_HTTP_PORT,
+        grpc_port=QDRANT_GRPC_PORT,
+        api_key=QDRANT_API_KEY,
+        https=QDRANT_HTTPS,
+    )
+    try:
+        collections = client.get_collections().collections or []
+        if not collections:
+            print("  (none)")
+            return
+        for col in collections:
+            name = col.name
+            try:
+                count = client.count(name, exact=True).count
+            except Exception as exc:  # pragma: no cover - diagnostic helper
+                print(f"  {name}: error ({exc})")
+            else:
+                print(f"  {name}: {count} embeddings")
+    except Exception as exc:
+        print(f"  Unable to query Qdrant: {exc}")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    print(f"📁 Data root: {DATA_ROOT}")
+    print(f"🗂  State dir: {STATE_DIR}")
+    summarise_bookmarks()
+    summarise_chats()
+    summarise_knowledge()
+    summarise_qdrant()
